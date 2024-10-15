@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>proton_sdk</AssemblyName>
+    <AssemblyName Condition="'$(RuntimeIdentifier)'=='linux-x64'">libproton_sdk</AssemblyName>
+    <AssemblyName Condition="'$(RuntimeIdentifier)'=='linux-arm64'">libproton_sdk</AssemblyName>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishAot>true</PublishAot>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Proton.Sdk\Proton.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="proton_drive_sdk" />
+    <InternalsVisibleTo Include="libproton_drive_sdk" />
+    <InternalsVisibleTo Include="$(AssemblyName).Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Proton.Cryptography" />
+  </ItemGroup>
+
+</Project>
