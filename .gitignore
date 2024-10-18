@@ -347,3 +347,7 @@ vcpkg_installed/
 
 # Visual Studio project launch settings
 **/Properties/launchSettings.json
+
+build
+.vscode
+
