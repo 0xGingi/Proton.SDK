@@ -1,4 +1,6 @@
-﻿using Proton.Sdk.Cryptography;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Proton.Sdk.Cryptography;
 
 namespace Proton.Sdk;
 
@@ -9,4 +11,5 @@ internal sealed class ProtonClientConfiguration(ProtonClientOptions options)
     public string UserAgent { get; } = options.UserAgent ?? string.Empty;
     public bool IgnoreSslCertificateErrors { get; } = options.IgnoreSslCertificateErrors ?? false;
     public ISecretsCache SecretsCache { get; } = options.SecretsCache ?? new InMemorySecretsCache();
+    public ILoggerFactory LoggerFactory { get; } = options.LoggerFactory ?? NullLoggerFactory.Instance;
 }

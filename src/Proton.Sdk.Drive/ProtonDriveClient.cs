@@ -1,4 +1,5 @@
-﻿using Microsoft.IO;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Devices;
 using Proton.Sdk.Drive.Files;
@@ -25,6 +26,10 @@ public sealed class ProtonDriveClient
         var maxDegreeOfParallelism = Math.Max(Math.Min(Environment.ProcessorCount / 2, 10), 1);
         BlockUploader = new BlockUploader(this, maxDegreeOfParallelism);
         BlockDownloader = new BlockDownloader(this, maxDegreeOfParallelism);
+
+        Logger = session.LoggerFactory.CreateLogger<ProtonDriveClient>();
+
+        Logger.Log(LogLevel.Information, "ProtonDriveClient instance was created. maxDegreeOfParallelism = {maxDegreeOfParallelism}", maxDegreeOfParallelism);
     }
 
     internal static RecyclableMemoryStreamManager MemoryStreamManager { get; } = new();
@@ -43,6 +48,7 @@ public sealed class ProtonDriveClient
 
     internal BlockUploader BlockUploader { get; }
     internal BlockDownloader BlockDownloader { get; }
+    internal ILogger<ProtonDriveClient> Logger { get; }
 
     public Task<Volume[]> GetVolumesAsync(CancellationToken cancellationToken)
     {

@@ -49,10 +49,12 @@ internal static class InteropProtonApiSession
     {
         try
         {
+            var idString = id.Utf8ToString();
+            var userIdString = userId.Utf8ToString();
             var session = ProtonApiSession.Resume(
-                id.Utf8ToString(),
+                idString,
                 username.Utf8ToString(),
-                new UserId(userId.Utf8ToString()),
+                new UserId(userIdString),
                 accessToken.Utf8ToString(),
                 refreshToken.Utf8ToString(),
                 scopes.Utf8ToString().Replace("[", string.Empty).Replace("]", string.Empty).Split(","),
@@ -83,7 +85,7 @@ internal static class InteropProtonApiSession
         return 0;
     }
 
-    [UnmanagedCallersOnly(EntryPoint = "add_armored_locked_user_key", CallConvs = [typeof(CallConvCdecl)])]
+    [UnmanagedCallersOnly(EntryPoint = "session_add_armored_locked_user_key", CallConvs = [typeof(CallConvCdecl)])]
     private static int AddUserKey(nint sessionHandle, InteropArray keyId, InteropArray keyData, InteropArray passphrase)
     {
         if (!TryGetFromHandle(sessionHandle, out var session))

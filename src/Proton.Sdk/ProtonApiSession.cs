@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Srp;
 using Proton.Sdk.Authentication;
 using Proton.Sdk.Cryptography;
@@ -10,6 +11,7 @@ public sealed class ProtonApiSession
 {
     private readonly HttpClient _httpClient;
     private readonly ProtonClientConfiguration _configuration;
+    private readonly ILogger _logger;
 
     private bool _isEnded;
 
@@ -22,10 +24,12 @@ public sealed class ProtonApiSession
         IEnumerable<string> scopes,
         bool isWaitingForSecondFactorCode,
         PasswordMode passwordMode,
-        ProtonClientConfiguration configuration)
+        ProtonClientConfiguration configuration,
+        ILogger<ProtonApiSession> logger)
     {
         _httpClient = configuration.GetHttpClient(this);
         _configuration = configuration;
+        _logger = logger;
 
         Username = username;
         UserId = userId;
@@ -52,6 +56,8 @@ public sealed class ProtonApiSession
 
     internal ISecretsCache SecretsCache => _configuration.SecretsCache;
 
+    internal ILoggerFactory LoggerFactory => _configuration.LoggerFactory;
+
     private AuthenticationApiClient AuthenticationApi => new(_httpClient);
     private KeysApiClient KeysApi => new(_httpClient);
 
@@ -67,6 +73,8 @@ public sealed class ProtonApiSession
         CancellationToken cancellationToken)
     {
         var configuration = new ProtonClientConfiguration(options);
+
+        var logger = configuration.LoggerFactory.CreateLogger<ProtonApiSession>();
 
         var httpClient = configuration.GetHttpClient();
 
@@ -96,7 +104,8 @@ public sealed class ProtonApiSession
             authResponse.Scopes,
             authResponse.SecondFactorParameters?.IsEnabled == true,
             authResponse.PasswordMode,
-            new ProtonClientConfiguration(options));
+            new ProtonClientConfiguration(options),
+            logger);
 
         if (session is { IsWaitingForSecondFactorCode: false, PasswordMode: PasswordMode.Single })
         {
@@ -127,7 +136,23 @@ public sealed class ProtonApiSession
     {
         var configuration = new ProtonClientConfiguration(options);
 
-        return new ProtonApiSession(id, username, userId, accessToken, refreshToken, scopes, isWaitingForSecondFactorCode, passwordMode, configuration);
+        var logger = configuration.LoggerFactory.CreateLogger<ProtonApiSession>();
+
+        var session = new ProtonApiSession(
+            id,
+            username,
+            userId,
+            accessToken,
+            refreshToken,
+            scopes,
+            isWaitingForSecondFactorCode,
+            passwordMode,
+            configuration,
+            logger);
+
+        logger.Log(LogLevel.Information, "Session {SessionId} was resumed for user {UserId}", session.Id, session.UserId);
+
+        return session;
     }
 
     public static async Task EndAsync(string id, string accessToken, ProtonClientOptions options)

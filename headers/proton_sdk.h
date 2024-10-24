@@ -2,7 +2,7 @@
 #define PROTON_SDK_H
 
 #include <stdint.h>
-#include <stdbool.h> 
+#include <stdbool.h>
 
 typedef struct {
     const uint8_t* pointer;
@@ -44,6 +44,7 @@ typedef struct {
     Utf8String user_agent;
     Utf8String base_url;
     bool ignore_ssl_certificate_errors;
+    intptr_t logger_provider_handle;
 } ProtonClientOptions;
 
 int session_begin(
@@ -62,7 +63,8 @@ int session_resume(
     bool isWaitingForSecondFactorCode,
     uint8_t passwordMode,
     ProtonClientOptions options,
-    intptr_t* session_handle);
+    intptr_t* session_handle
+);
 
 int session_add_user_key(
     intptr_t session_handle,
@@ -73,11 +75,13 @@ int session_add_armored_locked_user_key(
     intptr_t session_handle,
     Utf8String keyId,
     ByteArray keyData,
-    Utf8String passphrase);
+    Utf8String passphrase
+);
 
 int session_end(
     intptr_t session_handle,
-    AsyncVoidCallbackWithoutCancellation callback);
+    AsyncVoidCallbackWithoutCancellation callback
+);
 
 void session_free(intptr_t session_handle);
 
@@ -136,7 +140,8 @@ typedef struct {
 
 int drive_client_create(
     intptr_t session_handle,
-    intptr_t* out_client_handle);
+    intptr_t* out_client_handle
+);
 
 int drive_client_create_file(
     intptr_t client_handle,
@@ -144,21 +149,24 @@ int drive_client_create_file(
     NodeIdentity parent_folder,
     Utf8String name,
     Utf8String media_type,
-    AsyncFileRevisionPairCallback callback);
+    AsyncFileRevisionPairCallback callback
+);
 
 int drive_client_open_revision_for_reading(
     intptr_t client_handle,
     Utf8String share_id,
     NodeIdentity file,
     RevisionForTransfer revision,
-    AsyncHandleCallback callback);
+    AsyncHandleCallback callback
+);
 
 int drive_client_open_revision_for_writing(
     intptr_t client_handle,
     ShareForCommand share,
     NodeIdentity file,
     RevisionForTransfer revision,
-    AsyncHandleCallback callback);
+    AsyncHandleCallback callback
+);
 
 int drive_client_free(intptr_t client_handle);
 
@@ -183,20 +191,23 @@ typedef struct {
 int revision_reader_read(
     intptr_t reader_handle,
     ExternalWriter writer,
-    AsyncUInt8Callback callback);
+    AsyncUInt8Callback callback
+);
 
 int revision_reader_read_to_path(
     intptr_t reader_handle,
     Utf8String target_file_path,
-    AsyncUInt8Callback callback);
+    AsyncUInt8Callback callback
+);
 
 int revision_reader_free(intptr_t reader_handle);
 
 int revision_writer_write_to_path(
-    intptr_t writerHandle, 
-    Utf8String targetFilePath, 
-    long lastModificationTime, 
-    AsyncUInt8Callback callback);
+    intptr_t writerHandle,
+    Utf8String targetFilePath,
+    long lastModificationTime,
+    AsyncUInt8Callback callback
+);
 
 int node_decrypt_armored_name(
     intptr_t client_handle,
@@ -205,6 +216,22 @@ int node_decrypt_armored_name(
     Utf8String parent_link_id,
     Utf8String armored_encrypted_name,
     AsyncUtf8StringCallback callback
+);
+
+typedef struct {
+    uint8_t level;
+    Utf8String message;
+    Utf8String categoryName;
+} LogEvent;
+
+typedef struct {
+    const void* state;
+    void (*log_callback)(const void*, LogEvent);
+} LogCallback;
+
+int logger_provider_create(
+    LogCallback log_callback,
+    intptr_t* logger_provider_handle
 );
 
 #endif PROTON_SDK_H
