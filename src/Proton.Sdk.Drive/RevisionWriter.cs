@@ -73,6 +73,15 @@ public sealed class RevisionWriter : IDisposable
             {
                 try
                 {
+                    foreach (var sample in samples)
+                    {
+                        await WaitForBlockUploaderAsync(uploadTasks, manifestStream, cancellationToken).ConfigureAwait(false);
+
+                        var uploadTask = _client.BlockUploader.UploadAsync(_share, _fileId, _revisionId, _contentKey, _signingKey, sample, cancellationToken);
+
+                        uploadTasks.Enqueue(uploadTask);
+                    }
+
                     do
                     {
                         var plainDataPrefix = ArrayPool<byte>.Shared.Rent(blockVerifier.DataPacketPrefixMaxLength);
@@ -85,15 +94,7 @@ public sealed class RevisionWriter : IDisposable
 
                             blockSizes.Add((int)plainDataStream.Length);
 
-                            if (!await _client.BlockUploader.BlockSemaphore.WaitAsync(0, cancellationToken).ConfigureAwait(false))
-                            {
-                                if (uploadTasks.Count > 0)
-                                {
-                                    await AddNextBlockToManifestAsync(uploadTasks, manifestStream).ConfigureAwait(false);
-                                }
-
-                                await _client.BlockUploader.BlockSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                            }
+                            await WaitForBlockUploaderAsync(uploadTasks, manifestStream, cancellationToken).ConfigureAwait(false);
 
                             plainDataStream.Seek(0, SeekOrigin.Begin);
 
@@ -119,8 +120,6 @@ public sealed class RevisionWriter : IDisposable
                             throw;
                         }
                     } while (contentInputStream.Position < contentInputStream.Length);
-
-                    // TODO: upload samples
                 }
                 finally
                 {
@@ -171,6 +170,19 @@ public sealed class RevisionWriter : IDisposable
         var sha256Digest = await uploadTasks.Dequeue().ConfigureAwait(false);
 
         manifestStream.Write(sha256Digest);
+    }
+
+    private async ValueTask WaitForBlockUploaderAsync(Queue<Task<byte[]>> uploadTasks, RecyclableMemoryStream manifestStream, CancellationToken cancellationToken)
+    {
+        if (!await _client.BlockUploader.BlockSemaphore.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            if (uploadTasks.Count > 0)
+            {
+                await AddNextBlockToManifestAsync(uploadTasks, manifestStream).ConfigureAwait(false);
+            }
+
+            await _client.BlockUploader.BlockSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private RevisionUpdateParameters GetRevisionUpdateParameters(

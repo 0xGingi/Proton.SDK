@@ -2,8 +2,6 @@
 
 internal enum ThumbnailType
 {
-    Default,
-    Preview = 1,
-    HighDefinitionPreview = 2,
-    MachineLearning = 3,
+    Thumbnail = 1,
+    Preview = 2,
 }

@@ -2,6 +2,6 @@
 
 public enum FileSampleType
 {
-    Thumbnail,
-    Preview,
+    Thumbnail = 1,
+    Preview = 2,
 }

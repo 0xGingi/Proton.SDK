@@ -5,8 +5,8 @@ namespace Proton.Sdk.Drive.Files;
 internal sealed class BlockRequestResponse : ApiResponse
 {
     [JsonPropertyName("UploadLinks")]
-    public required IReadOnlyList<BlockUploadUrl> UploadUrls { get; init; }
+    public required IReadOnlyList<BlockUploadTarget> UploadTargets { get; set; }
 
-    [JsonPropertyName("ThumbnailLink")]
-    public BlockUploadUrl? ThumbnailUrl { get; init; }
+    [JsonPropertyName("ThumbnailLinks")]
+    public required IReadOnlyList<ThumbnailBlockUploadTarget> ThumbnailUploadTargets { get; set; }
 }

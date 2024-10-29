@@ -1,6 +1,5 @@
 ﻿using System.Buffers;
 using System.Security.Cryptography;
-using Microsoft.IO;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Drive.Files;
 using Proton.Sdk.Drive.Verification;
@@ -31,7 +30,7 @@ internal sealed class BlockUploader
         PgpSessionKey contentKey,
         PgpPrivateKey signingKey,
         PgpKey signatureEncryptionKey,
-        RecyclableMemoryStream plainDataStream,
+        Stream plainDataStream,
         BlockVerifier verifier,
         byte[] plainDataPrefix,
         int plainDataPrefixLength,
@@ -101,10 +100,12 @@ internal sealed class BlockUploader
 
                     var uploadRequestResponse = await _client.FilesApi.RequestBlockUploadAsync(parameters, cancellationToken).ConfigureAwait(false);
 
+                    var uploadTarget = uploadRequestResponse.UploadTargets[0];
+                    var uploadTargetUrl = $"{uploadTarget.BareUrl}/{uploadTarget.Token}";
+
                     dataPacketStream.Seek(0, SeekOrigin.Begin);
 
-                    await _client.StorageApi.UploadBlobAsync(uploadRequestResponse.UploadUrls[0].Value, dataPacketStream, cancellationToken)
-                        .ConfigureAwait(false);
+                    await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
 
                     return sha256Digest;
                 }
@@ -118,6 +119,73 @@ internal sealed class BlockUploader
         finally
         {
             ArrayPool<byte>.Shared.Return(plainDataPrefix);
+        }
+    }
+
+    public async Task<byte[]> UploadAsync(
+        IShareForCommand share,
+        LinkId fileId,
+        RevisionId revisionId,
+        PgpSessionKey contentKey,
+        PgpPrivateKey signingKey,
+        FileSample sample,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var dataPacketStream = ProtonDriveClient.MemoryStreamManager.GetStream();
+            await using (dataPacketStream.ConfigureAwait(false))
+            {
+                using var sha256 = SHA256.Create();
+
+                var hashingStream = new CryptoStream(dataPacketStream, sha256, CryptoStreamMode.Write, leaveOpen: true);
+
+                await using (hashingStream.ConfigureAwait(false))
+                {
+                    var encryptingStream = contentKey.OpenEncryptingAndSigningStream(hashingStream, signingKey);
+
+                    await using (encryptingStream.ConfigureAwait(false))
+                    {
+                        encryptingStream.Write(sample.Content);
+                    }
+                }
+
+                var sha256Digest = sha256.Hash ?? [];
+
+                var parameters = new BlockUploadRequestParameters
+                {
+                    AddressId = share.MembershipAddressId.Value,
+                    ShareId = share.Id.Value,
+                    LinkId = fileId.Value,
+                    RevisionId = revisionId.Value,
+                    Blocks = [],
+                    Thumbnails =
+                    [
+                        new ThumbnailCreationParameters
+                        {
+                            Size = (int)dataPacketStream.Length,
+                            Type = (ThumbnailType)sample.Type,
+                            HashDigest = sha256Digest,
+                        },
+                    ],
+                };
+
+                var uploadRequestResponse = await _client.FilesApi.RequestBlockUploadAsync(parameters, cancellationToken).ConfigureAwait(false);
+
+                var uploadTarget = uploadRequestResponse.ThumbnailUploadTargets[0];
+                var uploadTargetUrl = $"{uploadTarget.BareUrl}/{uploadTarget.Token}";
+
+                dataPacketStream.Seek(0, SeekOrigin.Begin);
+
+                await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
+
+                return sha256Digest;
+            }
+        }
+        finally
+        {
+            BlockSemaphore.Release();
+            _client.RevisionCreationSemaphore.Release(1);
         }
     }
 }
