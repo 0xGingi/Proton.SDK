@@ -93,7 +93,7 @@ internal static class InteropRevisionReader
         }
         catch (Exception ex)
         {
-            return new SdkError(0, ex.Message);
+            return SdkError.FromException(ex);
         }
     }
 
@@ -107,7 +107,7 @@ internal static class InteropRevisionReader
         }
         catch (Exception ex)
         {
-            return new SdkError(0, ex.Message);
+            return SdkError.FromException(ex);
         }
     }
 }

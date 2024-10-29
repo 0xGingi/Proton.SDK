@@ -33,6 +33,8 @@ public enum ResponseCode
     /// </summary>
     AccountDisabled = 10003,
 
+    InvalidRefreshToken = 10013,
+
     /// <summary>
     /// Free account
     /// </summary>

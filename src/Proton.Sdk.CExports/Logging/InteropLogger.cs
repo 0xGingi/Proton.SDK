@@ -15,7 +15,7 @@ internal sealed class InteropLogger(InteropLogCallback logCallback, string categ
         where TState : notnull
     {
         // TODO: add support for scopes?
-        throw new NotSupportedException();
+        return new DummyDisposable();
     }
 
     public unsafe void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -29,5 +29,13 @@ internal sealed class InteropLogger(InteropLogCallback logCallback, string categ
     public bool IsEnabled(LogLevel logLevel)
     {
         return true;
+    }
+
+    private sealed class DummyDisposable : IDisposable
+    {
+        public void Dispose()
+        {
+            // do nothing intentionally
+        }
     }
 }

@@ -45,7 +45,7 @@ internal static class InteropRevisionWriter
         }
         catch (Exception ex)
         {
-            return new SdkError(0, ex.Message);
+            return SdkError.FromException(ex);
         }
     }
 

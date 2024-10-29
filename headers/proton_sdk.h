@@ -66,6 +66,17 @@ int session_resume(
     intptr_t* session_handle
 );
 
+int session_renew(
+    intptr_t oldSessionHandle,
+    Utf8String id,
+    Utf8String accessToken,
+    Utf8String refreshToken,
+    Utf8String scopes,
+    bool isWaitingForSecondFactorCode,
+    uint8_t passwordMode,
+    intptr_t* new_session_handle
+);
+
 int session_add_user_key(
     intptr_t session_handle,
     Utf8String keyId,

@@ -15,4 +15,12 @@ public class ProtonApiException : Exception
         : base(message, innerException)
     {
     }
+
+    public ProtonApiException(ResponseCode code, string message)
+        : base(message)
+    {
+        Code = code;
+    }
+
+    public ResponseCode Code { get; }
 }

@@ -72,6 +72,43 @@ internal static class InteropProtonApiSession
         }
     }
 
+    [UnmanagedCallersOnly(EntryPoint = "session_renew", CallConvs = [typeof(CallConvCdecl)])]
+    private static unsafe int Renew(
+        nint oldSessionHandle,
+        InteropArray id,
+        InteropArray accessToken,
+        InteropArray refreshToken,
+        InteropArray scopes,
+        bool isWaitingForSecondFactorCode,
+        byte passwordMode,
+        nint* newSessionHandle)
+    {
+        try
+        {
+            if (!TryGetFromHandle(oldSessionHandle, out var expiredSession))
+            {
+                return -1;
+            }
+
+            var session = ProtonApiSession.Renew(
+                expiredSession,
+                id.Utf8ToString(),
+                accessToken.Utf8ToString(),
+                refreshToken.Utf8ToString(),
+                scopes.Utf8ToString().Replace("[", string.Empty).Replace("]", string.Empty).Split(","),
+                isWaitingForSecondFactorCode,
+                (PasswordMode)passwordMode);
+
+            *newSessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
+
+            return 0;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
     [UnmanagedCallersOnly(EntryPoint = "session_add_user_key", CallConvs = [typeof(CallConvCdecl)])]
     private static int AddUserKey(nint sessionHandle, InteropArray keyId, InteropArray keyData)
     {
@@ -149,7 +186,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
-            return new SdkError(-1, e.Message);
+            return SdkError.FromException(e);
         }
     }
 
@@ -163,7 +200,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
-            return new SdkError(-1, e.Message);
+            return SdkError.FromException(e);
         }
     }
 }

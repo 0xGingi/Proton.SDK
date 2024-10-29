@@ -62,12 +62,18 @@ internal readonly struct AuthenticationApiClient(HttpClient httpClient)
             .DeleteAsync("auth/v4", sessionId, accessToken, CancellationToken.None).ConfigureAwait(false);
     }
 
-    public async Task<SessionRefreshResponse> RefreshSessionAsync(string refreshToken, CancellationToken cancellationToken)
+    public async Task<SessionRefreshResponse> RefreshSessionAsync(
+        string sessionId,
+        string accessToken,
+        string refreshToken,
+        CancellationToken cancellationToken)
     {
         return await _httpClient
             .Expecting(ProtonCoreApiSerializerContext.Default.SessionRefreshResponse)
             .PostAsync(
                 "auth/v4/refresh",
+                sessionId,
+                accessToken,
                 new SessionRefreshRequest(refreshToken),
                 ProtonCoreApiSerializerContext.Default.SessionRefreshRequest,
                 cancellationToken).ConfigureAwait(false);

@@ -148,7 +148,7 @@ internal static class InteropProtonDriveClient
         }
         catch (Exception ex)
         {
-            return new SdkError(-1, ex.Message);
+            return SdkError.FromException(ex);
         }
     }
 
@@ -167,7 +167,7 @@ internal static class InteropProtonDriveClient
         }
         catch (Exception ex)
         {
-            return new SdkError(-1, ex.Message);
+            return SdkError.FromException(ex);
         }
     }
 
@@ -186,7 +186,7 @@ internal static class InteropProtonDriveClient
         }
         catch (Exception ex)
         {
-            return new SdkError(-1, ex.Message);
+            return SdkError.FromException(ex);
         }
     }
 }

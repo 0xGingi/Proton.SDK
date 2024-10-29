@@ -1,24 +1,40 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Proton.Sdk.Authentication;
+using Proton.Sdk.Http;
 
 namespace Proton.Sdk;
 
 internal static class ProtonClientConfigurationExtensions
 {
+    private static readonly CookieContainer CookieContainer = new();
+
     public static HttpClient GetHttpClient(this ProtonClientConfiguration config, ProtonApiSession? session = null, string? baseRoutePath = default)
     {
         var baseAddress = baseRoutePath is not null ? new Uri(config.BaseUrl, baseRoutePath) : config.BaseUrl;
 
         var services = new ServiceCollection();
 
+        services.AddSingleton(config.LoggerFactory);
+
         services.ConfigureHttpClientDefaults(
             builder =>
             {
-                if (config.IgnoreSslCertificateErrors)
+                builder.UseSocketsHttpHandler((handler, _) =>
                 {
-                    builder.UseSocketsHttpHandler((handler, _) => handler.SslOptions.RemoteCertificateValidationCallback += (_, _, _, _) => true);
-                }
+                    handler.AddAutomaticDecompression();
+                    handler.ConfigureCookies(CookieContainer);
+
+                    if (config.IgnoreSslCertificateErrors)
+                    {
+                        handler.SslOptions.RemoteCertificateValidationCallback += (_, _, _, _) => true;
+                    }
+                    else if (!config.DisableTlsPinning)
+                    {
+                        handler.AddTlsPinning();
+                    }
+                });
 
                 builder.AddStandardResilienceHandler(
                     options =>

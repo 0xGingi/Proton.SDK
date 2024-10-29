@@ -14,7 +14,7 @@ internal static class HttpResponseMessageExtensions
             var response = await responseMessage.Content.ReadFromJsonAsync(ProtonCoreApiSerializerContext.Default.ApiResponse, cancellationToken)
                 .ConfigureAwait(false) ?? throw new JsonException();
 
-            throw new ProtonApiException($"{response.Code}: {response.ErrorMessage}");
+            throw new ProtonApiException(response.Code, $"{response.Code}: {response.ErrorMessage}");
         }
 
         responseMessage.EnsureSuccessStatusCode();

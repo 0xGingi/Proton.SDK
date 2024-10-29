@@ -10,17 +10,16 @@ namespace Proton.Sdk;
 public sealed class ProtonApiSession
 {
     private readonly HttpClient _httpClient;
-    private readonly ProtonClientConfiguration _configuration;
     private readonly ILogger _logger;
 
     private bool _isEnded;
+    private Action? _ended;
 
     private ProtonApiSession(
         string id,
         string username,
         UserId userId,
-        string accessToken,
-        string refreshToken,
+        TokenCredential tokenCredential,
         IEnumerable<string> scopes,
         bool isWaitingForSecondFactorCode,
         PasswordMode passwordMode,
@@ -28,16 +27,31 @@ public sealed class ProtonApiSession
         ILogger<ProtonApiSession> logger)
     {
         _httpClient = configuration.GetHttpClient(this);
-        _configuration = configuration;
         _logger = logger;
 
         Username = username;
         UserId = userId;
         Id = id;
-        TokenCredential = new TokenCredential(accessToken, refreshToken);
+        TokenCredential = tokenCredential;
         Scopes = scopes.ToArray().AsReadOnly();
         IsWaitingForSecondFactorCode = isWaitingForSecondFactorCode;
         PasswordMode = passwordMode;
+        Configuration = configuration;
+    }
+
+    public event Action? Ended
+    {
+        add
+        {
+            _ended += value;
+            TokenCredential.RefreshTokenExpired -= OnRefreshTokenExpired;
+            TokenCredential.RefreshTokenExpired += OnRefreshTokenExpired;
+        }
+        remove
+        {
+            _ended -= value;
+            TokenCredential.RefreshTokenExpired -= OnRefreshTokenExpired;
+        }
     }
 
     public string Id { get; }
@@ -54,9 +68,11 @@ public sealed class ProtonApiSession
 
     public PasswordMode PasswordMode { get; }
 
-    internal ISecretsCache SecretsCache => _configuration.SecretsCache;
+    internal ISecretsCache SecretsCache => Configuration.SecretsCache;
 
-    internal ILoggerFactory LoggerFactory => _configuration.LoggerFactory;
+    internal ILoggerFactory LoggerFactory => Configuration.LoggerFactory;
+
+    private ProtonClientConfiguration Configuration { get; }
 
     private AuthenticationApiClient AuthenticationApi => new(_httpClient);
     private KeysApiClient KeysApi => new(_httpClient);
@@ -95,12 +111,18 @@ public sealed class ProtonApiSession
         var authResponse = await authApiClient.AuthenticateAsync(sessionInitiationResponse, srpClientHandshake, username, cancellationToken)
             .ConfigureAwait(false);
 
+        var tokenCredential = new TokenCredential(
+            new AuthenticationApiClient(httpClient),
+            authResponse.SessionId,
+            authResponse.AccessToken,
+            authResponse.RefreshToken,
+            configuration.LoggerFactory.CreateLogger<TokenCredential>());
+
         var session = new ProtonApiSession(
             authResponse.SessionId,
             username,
             new UserId(authResponse.UserId),
-            authResponse.AccessToken,
-            authResponse.RefreshToken,
+            tokenCredential,
             authResponse.Scopes,
             authResponse.SecondFactorParameters?.IsEnabled == true,
             authResponse.PasswordMode,
@@ -138,21 +160,57 @@ public sealed class ProtonApiSession
 
         var logger = configuration.LoggerFactory.CreateLogger<ProtonApiSession>();
 
+        var tokenCredential = new TokenCredential(
+            new AuthenticationApiClient(configuration.GetHttpClient()),
+            id,
+            accessToken,
+            refreshToken,
+            configuration.LoggerFactory.CreateLogger<TokenCredential>());
+
         var session = new ProtonApiSession(
             id,
             username,
             userId,
-            accessToken,
-            refreshToken,
+            tokenCredential,
             scopes,
             isWaitingForSecondFactorCode,
             passwordMode,
             configuration,
             logger);
 
-        logger.Log(LogLevel.Information, "Session {SessionId} was resumed for user {UserId}", session.Id, session.UserId);
+        logger.Log(LogLevel.Information, "Session {SessionId} was resumed", session.Id);
 
         return session;
+    }
+
+    public static ProtonApiSession Renew(
+        ProtonApiSession expiredSession,
+        string id,
+        string accessToken,
+        string refreshToken,
+        IEnumerable<string> scopes,
+        bool isWaitingForSecondFactorCode,
+        PasswordMode passwordMode)
+    {
+        var tokenCredential = new TokenCredential(
+            new AuthenticationApiClient(expiredSession.Configuration.GetHttpClient()),
+            id,
+            accessToken,
+            refreshToken,
+            expiredSession.Configuration.LoggerFactory.CreateLogger<TokenCredential>());
+
+        var logger = expiredSession.Configuration.LoggerFactory.CreateLogger<ProtonApiSession>();
+
+        return new ProtonApiSession(
+            id,
+            expiredSession.Username,
+            expiredSession.UserId,
+            tokenCredential,
+            scopes,
+            isWaitingForSecondFactorCode,
+            passwordMode,
+            expiredSession.Configuration,
+            logger);
     }
 
     public static async Task EndAsync(string id, string accessToken, ProtonClientOptions options)
@@ -185,7 +243,7 @@ public sealed class ProtonApiSession
                 continue;
             }
 
-            _configuration.SecretsCache.Set(
+            Configuration.SecretsCache.Set(
                 GetAccountKeyPassphraseCacheKey(keySalt.KeyId),
                 DeriveSecretFromPassword(password.Span, keySalt.Value.Span).Span);
         }
@@ -207,7 +265,12 @@ public sealed class ProtonApiSession
 
         var response = await AuthenticationApi.EndSessionAsync().ConfigureAwait(false);
 
-        _isEnded = response.IsSuccess;
+        if (response.IsSuccess)
+        {
+            _isEnded = true;
+
+            _ended?.Invoke();
+        }
 
         return _isEnded;
     }
@@ -215,18 +278,17 @@ public sealed class ProtonApiSession
     public void AddUserKey(UserId userId, UserKeyId keyId, ReadOnlySpan<byte> keyData)
     {
         var cacheKey = GetUserKeyPassphraseCacheKey(keyId);
-        _configuration.SecretsCache.Set(cacheKey, keyData, 1);
+        Configuration.SecretsCache.Set(cacheKey, keyData, 1);
         var cacheKeys = new List<CacheKey>(1) { cacheKey };
-        _configuration.SecretsCache.IncludeInGroup(GetUserKeyGroupCacheKey(userId), CollectionsMarshal.AsSpan(cacheKeys));
+        Configuration.SecretsCache.IncludeInGroup(GetUserKeyGroupCacheKey(userId), CollectionsMarshal.AsSpan(cacheKeys));
     }
 
-    private static CacheKey GetUserKeyGroupCacheKey(UserId id) => new("user", id.Value, "keys");
     internal static CacheKey GetUserKeyPassphraseCacheKey(UserKeyId keyId) => GetAccountKeyPassphraseCacheKey(keyId.Value);
     internal static CacheKey GetLegacyAddressKeyPassphraseCacheKey(AddressKeyId keyId) => GetAccountKeyPassphraseCacheKey(keyId.Value);
 
     internal HttpClient GetHttpClient(string? baseRoutePath = default)
     {
-        return baseRoutePath is null ? _httpClient : _configuration.GetHttpClient(this, baseRoutePath);
+        return baseRoutePath is null ? _httpClient : Configuration.GetHttpClient(this, baseRoutePath);
     }
 
     private static ReadOnlyMemory<byte> DeriveSecretFromPassword(ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt)
@@ -238,4 +300,11 @@ public sealed class ProtonApiSession
     }
 
     private static CacheKey GetAccountKeyPassphraseCacheKey(string keyId) => new("account-key", keyId, "passphrase");
+    private static CacheKey GetUserKeyGroupCacheKey(UserId id) => new("user", id.Value, "keys");
+
+    private void OnRefreshTokenExpired()
+    {
+        _isEnded = true;
+        _ended?.Invoke();
+    }
 }

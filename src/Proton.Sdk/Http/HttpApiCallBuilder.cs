@@ -39,12 +39,13 @@ internal readonly struct HttpApiCallBuilder<TResponseBody>
 
     public async ValueTask<TResponseBody> PostAsync<TRequestBody>(
         string requestUri,
+        string sessionId,
         string accessToken,
         TRequestBody body,
         JsonTypeInfo<TRequestBody> bodyTypeInfo,
         CancellationToken cancellationToken)
     {
-        using var requestMessage = HttpRequestMessageFactory.Create(HttpMethod.Post, requestUri, accessToken, body, bodyTypeInfo);
+        using var requestMessage = HttpRequestMessageFactory.Create(HttpMethod.Post, requestUri, sessionId, accessToken, body, bodyTypeInfo);
         return await SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
     }
 
