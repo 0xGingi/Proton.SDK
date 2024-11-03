@@ -1,9 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>proton_drive_sdk</AssemblyName>
-    <AssemblyName Condition="'$(RuntimeIdentifier)'=='linux-x64'">libproton_drive_sdk</AssemblyName>
-    <AssemblyName Condition="'$(RuntimeIdentifier)'=='linux-arm64'">libproton_drive_sdk</AssemblyName>
+    <AssemblyName>libproton_drive_sdk</AssemblyName>
+    <AssemblyName Condition="!$(RuntimeIdentifier.StartsWith('linux')) And !$(RuntimeIdentifier.StartsWith('android'))">proton_drive_sdk</AssemblyName>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -16,10 +15,24 @@
     <ProjectReference Include="..\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Drive\Proton.Sdk.Drive.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Instrumentation.CExport\Proton.Sdk.Instrumentation.CExport.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- While the project does not use the package directly, the path to the package is needed to refer to the static link library -->
+    <PackageReference Include="Proton.Cryptography" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <CryptoLibFileName>libproton_crypto.a</CryptoLibFileName>
+    <CryptoLibFileName Condition="$(RuntimeIdentifier.StartsWith('win'))">proton_crypto.lib</CryptoLibFileName>
+    <CryptoLibFileName Condition="$(RuntimeIdentifier.StartsWith('osx')) Or $(RuntimeIdentifier.StartsWith('ios'))">proton_crypto.a</CryptoLibFileName>
+  </PropertyGroup>
+
+  <ItemGroup>
     <IlcCompileInput Include="$(OutputPath)\proton_sdk.dll" />
     <IlcCompileInput Include="$(OutputPath)\proton_instrumentation_sdk.dll" />
     <DirectPInvoke Include="proton_crypto" />
-    <NativeLibrary Include="../../build/output/crypto_static/proton_crypto.a" />
+    <NativeLibrary Include="$(PkgProton_Cryptography)\runtimes\$(RuntimeIdentifier)\native\$(CryptoLibFileName)" />
   </ItemGroup>
 
 </Project>
