@@ -6,24 +6,32 @@ namespace Proton.Sdk.Drive;
 
 public sealed class RevisionReader : IDisposable
 {
-    private const int MinBlockIndex = 1;
-    private const int BlockPageSize = 15;
+    public const int BlockPageSize = 10;
+    public const int MinBlockIndex = 1;
 
     private readonly ProtonDriveClient _client;
     private readonly ShareId _shareId;
     private readonly INodeIdentity _file;
     private readonly IRevisionForTransfer _revision;
     private readonly PgpSessionKey _contentKey;
+    private readonly RevisionResponse _revisionResponse;
 
     private bool _semaphoreReleased;
 
-    internal RevisionReader(ProtonDriveClient client, ShareId shareId, INodeIdentity file, IRevisionForTransfer revision, PgpSessionKey contentKey)
+    internal RevisionReader(
+        ProtonDriveClient client,
+        ShareId shareId,
+        INodeIdentity file,
+        IRevisionForTransfer revision,
+        PgpSessionKey contentKey,
+        RevisionResponse revisionResponse)
     {
         _client = client;
         _shareId = shareId;
         _file = file;
         _revision = revision;
         _contentKey = contentKey;
+        _revisionResponse = revisionResponse;
     }
 
     public async Task<VerificationStatus> ReadAsync(Stream contentOutputStream, CancellationToken cancellationToken)
@@ -42,7 +50,7 @@ public sealed class RevisionReader : IDisposable
             {
                 try
                 {
-                    await foreach (var (block, _) in GetBlocksAsync(cancellationToken))
+                    await foreach (var (block, _) in GetBlocksAsync(_revisionResponse, cancellationToken))
                     {
                         if (!await _client.BlockDownloader.BlockSemaphore.WaitAsync(0, cancellationToken).ConfigureAwait(false))
                         {
@@ -152,10 +160,9 @@ public sealed class RevisionReader : IDisposable
         return new BlockDownloadResult(blockOutputStream, isIntermediateStream, hash);
     }
 
-    private async IAsyncEnumerable<(Block Value, bool IsLast)> GetBlocksAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    private async IAsyncEnumerable<(Block Value, bool IsLast)> GetBlocksAsync(RevisionResponse revisionResponse, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var mustTryNextPageOfBlocks = true;
-        var lastKnownIndex = MinBlockIndex - 1;
         var nextExpectedIndex = 1;
         var outstandingBlock = default(Block);
         var currentPageBlocks = new List<Block>(BlockPageSize);
@@ -163,16 +170,6 @@ public sealed class RevisionReader : IDisposable
         while (mustTryNextPageOfBlocks)
         {
             currentPageBlocks.Clear();
-
-            var revisionResponse =
-                await _client.FilesApi.GetRevisionAsync(
-                    _shareId,
-                    _file.Id,
-                    _revision.Id,
-                    lastKnownIndex + 1,
-                    BlockPageSize,
-                    false,
-                    cancellationToken).ConfigureAwait(false);
 
             var revision = revisionResponse.Revision;
 
@@ -192,7 +189,7 @@ public sealed class RevisionReader : IDisposable
             var blocksToReturn = outstandingBlock is not null ? blocksExceptLast.Prepend(outstandingBlock) : blocksExceptLast;
 
             outstandingBlock = currentPageBlocks[^1];
-            lastKnownIndex = outstandingBlock.Index;
+            var lastKnownIndex = outstandingBlock.Index;
 
             foreach (var block in blocksToReturn)
             {
@@ -206,6 +203,19 @@ public sealed class RevisionReader : IDisposable
                 ++nextExpectedIndex;
 
                 yield return (block, false);
+            }
+
+            if (mustTryNextPageOfBlocks)
+            {
+                revisionResponse =
+                    await _client.FilesApi.GetRevisionAsync(
+                        _shareId,
+                        _file.Id,
+                        _revision.Id,
+                        lastKnownIndex + 1,
+                        BlockPageSize,
+                        false,
+                        cancellationToken).ConfigureAwait(false);
             }
         }
 

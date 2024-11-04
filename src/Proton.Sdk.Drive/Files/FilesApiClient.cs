@@ -7,10 +7,13 @@ internal readonly struct FilesApiClient(HttpClient httpClient)
 {
     private readonly HttpClient _httpClient = httpClient;
 
-    public async Task<FileCreationResponse> CreateFileAsync(ShareId shareId, FileCreationParameters parameters, CancellationToken cancellationToken)
+    public async Task<FileCreationResponse> CreateFileAsync(
+        ShareId shareId,
+        FileCreationParameters parameters,
+        CancellationToken cancellationToken)
     {
         return await _httpClient
-            .Expecting(ProtonDriveApiSerializerContext.Default.FileCreationResponse)
+            .Expecting(ProtonDriveApiSerializerContext.Default.FileCreationResponse, ProtonDriveApiSerializerContext.Default.RevisionConflictResponse)
             .PostAsync($"shares/{shareId}/files", parameters, ProtonDriveApiSerializerContext.Default.FileCreationParameters, cancellationToken)
             .ConfigureAwait(false);
     }

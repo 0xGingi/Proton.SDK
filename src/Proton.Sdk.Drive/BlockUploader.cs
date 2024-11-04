@@ -112,6 +112,7 @@ internal sealed class BlockUploader
             finally
             {
                 BlockSemaphore.Release();
+                _client.RevisionCreationSemaphore.Release(1);
             }
         }
         finally

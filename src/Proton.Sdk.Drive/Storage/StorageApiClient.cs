@@ -2,6 +2,7 @@
 using System.Net.Mime;
 using Proton.Sdk.Drive.Serialization;
 using Proton.Sdk.Http;
+using Proton.Sdk.Serialization;
 
 namespace Proton.Sdk.Drive.Storage;
 
@@ -29,7 +30,7 @@ internal readonly struct StorageApiClient(HttpClient httpClient)
     {
         var blobResponse = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
-        await blobResponse.EnsureApiSuccessAsync(cancellationToken).ConfigureAwait(false);
+        await blobResponse.EnsureApiSuccessAsync(ProtonCoreApiSerializerContext.Default.ApiResponse, cancellationToken).ConfigureAwait(false);
 
         return await blobResponse.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
     }

@@ -63,9 +63,18 @@ public sealed class Revision : IRevisionForTransfer
 
         var contentKey = await FileNode.GetContentKeyAsync(client, shareId, file.VolumeId, file.Id, cancellationToken).ConfigureAwait(false);
 
+        var revisionResponse = await client.FilesApi.GetRevisionAsync(
+            shareId,
+            file.Id,
+            revision.Id,
+            RevisionReader.MinBlockIndex,
+            RevisionReader.BlockPageSize,
+            false,
+            cancellationToken).ConfigureAwait(false);
+
         await client.BlockDownloader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        return new RevisionReader(client, shareId, file, revision, contentKey);
+        return new RevisionReader(client, shareId, file, revision, contentKey, revisionResponse);
     }
 
     internal static async Task<RevisionWriter> OpenForWritingAsync(

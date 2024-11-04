@@ -11,7 +11,6 @@ using Proton.Sdk.Events;
 namespace Proton.Sdk.Drive.Serialization;
 
 [JsonSourceGenerationOptions]
-[JsonSerializable(typeof(ApiResponse))]
 [JsonSerializable(typeof(VolumeListResponse))]
 [JsonSerializable(typeof(VolumeCreationParameters))]
 [JsonSerializable(typeof(VolumeCreationResponse))]
@@ -29,6 +28,7 @@ namespace Proton.Sdk.Drive.Serialization;
 [JsonSerializable(typeof(FolderCreationResponse))]
 [JsonSerializable(typeof(FileCreationParameters))]
 [JsonSerializable(typeof(FileCreationResponse))]
+[JsonSerializable(typeof(RevisionConflictResponse))]
 [JsonSerializable(typeof(BlockUploadRequestParameters))]
 [JsonSerializable(typeof(BlockRequestResponse))]
 [JsonSerializable(typeof(RevisionUpdateParameters))]

@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Addresses;
 using Proton.Sdk.Cryptography;
@@ -43,16 +42,13 @@ public sealed class ProtonAccountClient(ProtonApiSession session)
 
     internal async Task<IReadOnlyList<PgpPrivateKey>> GetUserKeysAsync(CancellationToken cancellationToken)
     {
-        Trace.WriteLine("In GetUserKeysAsync");
         if (!SecretsCache.TryUseGroup(GetUserKeyGroupCacheKey(_userId), (bytes, _) => PgpPrivateKey.Import(bytes), out var keys))
         {
-            Trace.WriteLine("In GetUserKeysAsync: before RefreshUserKeysAsync");
             await RefreshUserKeysAsync(cancellationToken).ConfigureAwait(false);
         }
 
         if (!SecretsCache.TryUseGroup(GetUserKeyGroupCacheKey(_userId), (bytes, _) => PgpPrivateKey.Import(bytes), out keys))
         {
-            Trace.WriteLine("In GetUserKeysAsync: before new ProtonApiException");
             throw new ProtonApiException("No active user key was found.");
         }
 
@@ -93,15 +89,12 @@ public sealed class ProtonAccountClient(ProtonApiSession session)
         var unlockedKeys = new List<PgpPrivateKey>(response.User.Keys.Count);
         var cacheKeys = new List<CacheKey>(response.User.Keys.Count);
 
-        Trace.WriteLine($"In RefreshUserKeysAsync: response.User.Keys.Count = {response.User.Keys.Count}, In RefreshUserKeysAsync: response.User.Keys = {response.User.Keys}");
-
         foreach (var userKey in response.User.Keys)
         {
             var userKeyId = new UserKeyId(userKey.Id);
 
             if (!userKey.IsActive)
             {
-                Trace.WriteLine("In RefreshUserKeysAsync: !userKey.IsActive");
                 continue;
             }
 
@@ -111,7 +104,6 @@ public sealed class ProtonAccountClient(ProtonApiSession session)
                 out var unlockedUserKey))
             {
                 // TODO: do something about that
-                Trace.WriteLine("In RefreshUserKeysAsync: // TODO: do something about that");
                 continue;
             }
 
@@ -124,7 +116,6 @@ public sealed class ProtonAccountClient(ProtonApiSession session)
 
         if (unlockedKeys.Count == 0)
         {
-            Trace.WriteLine("In RefreshUserKeysAsync: before ProtonApiException");
             throw new ProtonApiException("No active user key was found.");
         }
 

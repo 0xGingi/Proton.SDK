@@ -1,11 +1,21 @@
 ﻿using System.Text.Json.Serialization.Metadata;
+using Proton.Sdk.Serialization;
 
 namespace Proton.Sdk.Http;
 
 internal static class HttpClientExtensions
 {
-    public static HttpApiCallBuilder<T> Expecting<T>(this HttpClient httpClient, JsonTypeInfo<T> responseTypeInfo)
+    public static HttpApiCallBuilder<TSuccess, ApiResponse> Expecting<TSuccess>(this HttpClient httpClient, JsonTypeInfo<TSuccess> successTypeInfo)
     {
-        return new HttpApiCallBuilder<T>(httpClient, responseTypeInfo);
+        return new HttpApiCallBuilder<TSuccess, ApiResponse>(httpClient, successTypeInfo, ProtonCoreApiSerializerContext.Default.ApiResponse);
+    }
+
+    public static HttpApiCallBuilder<TSuccess, TFailure> Expecting<TSuccess, TFailure>(
+        this HttpClient httpClient,
+        JsonTypeInfo<TSuccess> successTypeInfo,
+        JsonTypeInfo<TFailure> failureTypeInfo)
+        where TFailure : ApiResponse
+    {
+        return new HttpApiCallBuilder<TSuccess, TFailure>(httpClient, successTypeInfo, failureTypeInfo);
     }
 }

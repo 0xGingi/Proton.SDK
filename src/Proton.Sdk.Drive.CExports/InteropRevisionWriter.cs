@@ -21,13 +21,13 @@ internal static class InteropRevisionWriter
     {
         try
         {
-        if (!TryGetFromHandle(writerHandle, out var writer))
-        {
-            return -1;
-        }
+            if (!TryGetFromHandle(writerHandle, out var writer))
+            {
+                return -1;
+            }
 
-        callback.InvokeFor(ct => WriteAsync(writer, targetFilePath.Utf8ToString(), DateTimeOffset.FromUnixTimeSeconds(lastModificationTime).UtcDateTime, ct));
-        return 0;
+            callback.InvokeFor(ct => WriteAsync(writer, targetFilePath.Utf8ToString(), DateTimeOffset.FromUnixTimeSeconds(lastModificationTime).UtcDateTime, ct));
+            return 0;
         }
         catch
         {

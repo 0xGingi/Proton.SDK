@@ -16,21 +16,31 @@ public sealed class ProtonDriveClient
 {
     private readonly HttpClient _httpClient;
 
-    public ProtonDriveClient(ProtonApiSession session)
+    /// <summary>
+    /// Creates a new instance of <see cref="ProtonDriveClient"/>.
+    /// </summary>
+    /// <param name="session">Authentication session</param>
+    /// <param name="id">Unique identifier for this client used to identify draft revisions that it may re-use.</param>
+    public ProtonDriveClient(ProtonApiSession session, string? id = default)
     {
         _httpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute);
+
+        Id = id ?? Guid.NewGuid().ToString();
 
         Account = new ProtonAccountClient(session);
         SecretsCache = session.SecretsCache;
 
-        var maxDegreeOfParallelism = Math.Max(Math.Min(Environment.ProcessorCount / 2, 10), 1);
-        BlockUploader = new BlockUploader(this, maxDegreeOfParallelism);
-        BlockDownloader = new BlockDownloader(this, maxDegreeOfParallelism);
+        var maxDegreeOfBlockTransferParallelism = Math.Max(Math.Min(Environment.ProcessorCount / 2, 8), 2);
+        var maxDegreeOfBlockProcessingParallelism = maxDegreeOfBlockTransferParallelism + Math.Min(Math.Max(maxDegreeOfBlockTransferParallelism / 2, 2), 4);
+        RevisionBlockListingSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism);
+        RevisionCreationSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism);
+        BlockUploader = new BlockUploader(this, maxDegreeOfBlockTransferParallelism);
+        BlockDownloader = new BlockDownloader(this, maxDegreeOfBlockTransferParallelism);
 
         Logger = session.LoggerFactory.CreateLogger<ProtonDriveClient>();
-
-        Logger.Log(LogLevel.Information, "ProtonDriveClient instance was created. maxDegreeOfParallelism = {maxDegreeOfParallelism}", maxDegreeOfParallelism);
     }
+
+    public string Id { get; }
 
     internal static RecyclableMemoryStreamManager MemoryStreamManager { get; } = new();
 
@@ -48,6 +58,8 @@ public sealed class ProtonDriveClient
 
     internal BlockUploader BlockUploader { get; }
     internal BlockDownloader BlockDownloader { get; }
+    internal FifoFlexibleSemaphore RevisionBlockListingSemaphore { get; }
+    internal FifoFlexibleSemaphore RevisionCreationSemaphore { get; }
     internal ILogger<ProtonDriveClient> Logger { get; }
 
     public Task<Volume[]> GetVolumesAsync(CancellationToken cancellationToken)
@@ -85,14 +97,20 @@ public sealed class ProtonDriveClient
         return FolderNode.GetChildrenAsync(this, shareId, volumeId, folderId, includeHidden, cancellationToken);
     }
 
-    public Task<(FileNode File, Revision DraftRevision)> CreateFileAsync(
-        IShareForCommand share,
-        INodeIdentity parentFolder,
-        string name,
-        string mediaType,
-        CancellationToken cancellationToken)
+    public async Task<FileUploader> WaitForFileUploaderAsync(long size, int numberOfSamples, CancellationToken cancellationToken)
     {
-        return FileNode.CreateAsync(this, share, parentFolder, name, mediaType, cancellationToken);
+        var expectedNumberOfBlocks = (int)size.DivideAndRoundUp(RevisionWriter.DefaultBlockSize) + numberOfSamples;
+
+        await RevisionCreationSemaphore.EnterAsync(expectedNumberOfBlocks, cancellationToken).ConfigureAwait(false);
+
+        return new FileUploader(this, expectedNumberOfBlocks);
+    }
+
+    public async Task<FileDownloader> WaitForFileDownloaderAsync(CancellationToken cancellationToken)
+    {
+        await RevisionBlockListingSemaphore.EnterAsync(1, cancellationToken).ConfigureAwait(false);
+
+        return new FileDownloader(this);
     }
 
     public Task<Revision[]> GetFileRevisionsAsync(ShareId shareId, INodeIdentity file, CancellationToken cancellationToken)
@@ -118,24 +136,6 @@ public sealed class ProtonDriveClient
     public Task<FolderNode> CreateFolderAsync(IShareForCommand share, INodeIdentity parentFolder, string name, CancellationToken cancellationToken)
     {
         return FolderNode.CreateAsync(this, share, parentFolder, name, cancellationToken);
-    }
-
-    public Task<RevisionReader> OpenRevisionForReadingAsync(
-        ShareId shareId,
-        INodeIdentity file,
-        IRevisionForTransfer revision,
-        CancellationToken cancellationToken)
-    {
-        return Revision.OpenForReadingAsync(this, shareId, file, revision, cancellationToken);
-    }
-
-    public Task<RevisionWriter> OpenRevisionForWritingAsync(
-        IShareForCommand share,
-        INodeIdentity file,
-        IRevisionForTransfer revision,
-        CancellationToken cancellationToken)
-    {
-        return Revision.OpenForWritingAsync(this, share, file, revision, cancellationToken);
     }
 
     public Task TrashNodesAsync(ShareId shareId, INodeIdentity folder, IEnumerable<LinkId> nodeIds, CancellationToken cancellationToken)

@@ -1,6 +1,7 @@
 ﻿namespace Proton.Sdk;
 
-public class ProtonApiException : Exception
+internal sealed class ProtonApiException<T> : ProtonApiException
+    where T : ApiResponse
 {
     public ProtonApiException()
     {
@@ -16,11 +17,11 @@ public class ProtonApiException : Exception
     {
     }
 
-    internal ProtonApiException(ApiResponse response)
-        : this($"{response.Code}: {response.ErrorMessage}")
+    public ProtonApiException(T response)
+        : base(response)
     {
-        Code = response.Code;
+        Response = response;
     }
 
-    public ResponseCode Code { get; }
+    public T? Response { get; }
 }

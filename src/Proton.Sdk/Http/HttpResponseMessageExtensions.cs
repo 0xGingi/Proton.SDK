@@ -1,22 +1,40 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Proton.Sdk.Serialization;
 
 namespace Proton.Sdk.Http;
 
 internal static class HttpResponseMessageExtensions
 {
-    public static async Task EnsureApiSuccessAsync(this HttpResponseMessage responseMessage, CancellationToken cancellationToken)
+    public static async Task EnsureApiSuccessAsync<TFailure>(
+        this HttpResponseMessage responseMessage,
+        JsonTypeInfo<TFailure> failureTypeInfo,
+        CancellationToken cancellationToken)
+        where TFailure : ApiResponse
     {
-        if (responseMessage.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity or HttpStatusCode.TooManyRequests)
+        switch (responseMessage.StatusCode)
         {
-            var response = await responseMessage.Content.ReadFromJsonAsync(ProtonCoreApiSerializerContext.Default.ApiResponse, cancellationToken)
-                .ConfigureAwait(false) ?? throw new JsonException();
+            case HttpStatusCode.UnprocessableEntity or HttpStatusCode.Conflict:
+                {
+                    var response = await responseMessage.Content.ReadFromJsonAsync(failureTypeInfo, cancellationToken)
+                        .ConfigureAwait(false) ?? throw new JsonException();
 
-            throw new ProtonApiException(response.Code, $"{response.Code}: {response.ErrorMessage}");
+                    throw new ProtonApiException<TFailure>(response);
+                }
+
+            case HttpStatusCode.BadRequest or HttpStatusCode.TooManyRequests:
+                {
+                    var response = await responseMessage.Content.ReadFromJsonAsync(ProtonCoreApiSerializerContext.Default.ApiResponse, cancellationToken)
+                        .ConfigureAwait(false) ?? throw new JsonException();
+
+                    throw new ProtonApiException(response);
+                }
+
+            default:
+                responseMessage.EnsureSuccessStatusCode();
+                break;
         }
-
-        responseMessage.EnsureSuccessStatusCode();
     }
 }

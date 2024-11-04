@@ -98,26 +98,29 @@ public sealed class RevisionWriter : IDisposable
                             plainDataStream.Seek(0, SeekOrigin.Begin);
 
                             var uploadTask = _client.BlockUploader.UploadAsync(
-                                    _share,
-                                    _fileId,
-                                    _revisionId,
-                                    ++blockIndex,
-                                    _contentKey,
-                                    _signingKey,
-                                    _fileKey,
-                                    plainDataStream,
-                                    blockVerifier,
-                                    plainDataPrefix,
-                                    (int)Math.Min(blockVerifier.DataPacketPrefixMaxLength, plainDataStream.Length),
-                                    cancellationToken);
+                                _share,
+                                _fileId,
+                                _revisionId,
+                                ++blockIndex,
+                                _contentKey,
+                                _signingKey,
+                                _fileKey,
+                                plainDataStream,
+                                blockVerifier,
+                                plainDataPrefix,
+                                (int)Math.Min(blockVerifier.DataPacketPrefixMaxLength, plainDataStream.Length),
+                                cancellationToken);
 
                             uploadTasks.Enqueue(uploadTask);
                         }
                         catch
                         {
                             ArrayPool<byte>.Shared.Return(plainDataPrefix);
+                            throw;
                         }
                     } while (contentInputStream.Position < contentInputStream.Length);
+
+                    // TODO: upload samples
                 }
                 finally
                 {
@@ -139,6 +142,7 @@ public sealed class RevisionWriter : IDisposable
                 finally
                 {
                     _client.BlockUploader.BlockSemaphore.Release(uploadTasks.Count);
+                    _client.RevisionCreationSemaphore.Release(uploadTasks.Count);
                 }
 
                 throw;
@@ -181,7 +185,7 @@ public sealed class RevisionWriter : IDisposable
             Common = new CommonExtendedAttributes
             {
                 Size = contentInputStream.Length,
-                LastModificationTime = lastModificationTime?.UtcDateTime,
+                ModificationTime = lastModificationTime?.UtcDateTime,
                 BlockSizes = blockSizes,
             },
         };

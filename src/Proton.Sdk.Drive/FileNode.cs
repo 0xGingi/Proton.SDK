@@ -71,9 +71,25 @@ public sealed class FileNode(VolumeId volumeId, LinkId id, LinkId? parentId, str
             ContentKeyPacketSignature = key.Sign(contentKeyToken),
         };
 
-        var response = await client.FilesApi.CreateFileAsync(share.Id, parameters, cancellationToken).ConfigureAwait(false);
+        LinkId id;
+        RevisionId revisionId;
+        try
+        {
+            var response = await client.FilesApi.CreateFileAsync(share.Id, parameters, cancellationToken).ConfigureAwait(false);
 
-        var id = new LinkId(response.RevisionIdentity.LinkId);
+            id = new LinkId(response.RevisionIdentity.LinkId);
+            revisionId = new RevisionId(response.RevisionIdentity.RevisionId);
+        }
+        catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { DraftClientId: not null, DraftRevisionId: not null } })
+        {
+            if (ex.Response.Conflict.DraftClientId != client.Id)
+            {
+                throw;
+            }
+
+            id = new LinkId(ex.Response.Conflict.LinkId);
+            revisionId = new RevisionId(ex.Response.Conflict.DraftRevisionId);
+        }
 
         client.SecretsCache.Set(GetNodeKeyCacheKey(parentFolder.VolumeId, id), key.ToBytes());
         client.SecretsCache.Set(GetNameSessionKeyCacheKey(parentFolder.VolumeId, id), nameSessionKey.Export().Token);
@@ -82,7 +98,7 @@ public sealed class FileNode(VolumeId volumeId, LinkId id, LinkId? parentId, str
 
         var file = new FileNode(parentFolder.VolumeId, id, parentFolder.Id, name, nameHashDigest, NodeState.Draft);
 
-        var draftRevision = new Revision(file.VolumeId, id, new RevisionId(response.RevisionIdentity.RevisionId), RevisionState.Draft, 0, default);
+        var draftRevision = new Revision(file.VolumeId, id, revisionId, RevisionState.Draft, 0, default);
 
         return (file, draftRevision);
     }
