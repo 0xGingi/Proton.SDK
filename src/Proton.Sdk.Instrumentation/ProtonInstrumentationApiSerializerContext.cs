@@ -1,5 +1,5 @@
 ﻿using System.Text.Json.Serialization;
-using Proton.Sdk.Instrumentation.Observability;
+using Proton.Sdk.Instrumentation.Provider;
 
 namespace Proton.Sdk.Instrumentation;
 

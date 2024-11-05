@@ -1,4 +1,4 @@
-﻿using Proton.Sdk.Instrumentation;
+﻿using Proton.Sdk.Instrumentation.Metrics;
 
 namespace Proton.Sdk.Drive.Instrumentation;
 

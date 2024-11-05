@@ -1,6 +1,6 @@
 ﻿using Proton.Sdk.Http;
 
-namespace Proton.Sdk.Instrumentation.Observability;
+namespace Proton.Sdk.Instrumentation.Provider;
 
 internal readonly struct ObservabilityApiClient(HttpClient httpClient)
 {
@@ -10,7 +10,7 @@ internal readonly struct ObservabilityApiClient(HttpClient httpClient)
     {
         return await _httpClient
             .Expecting(ProtonInstrumentationApiSerializerContext.Default.ApiResponse)
-            .PostAsync("/v1/metrics", metricsParameters, ProtonInstrumentationApiSerializerContext.Default.ObservabilityMetricsParameters, cancellationToken)
+            .PostAsync("/data/v1/metrics", metricsParameters, ProtonInstrumentationApiSerializerContext.Default.ObservabilityMetricsParameters, cancellationToken)
             .ConfigureAwait(false);
     }
 }

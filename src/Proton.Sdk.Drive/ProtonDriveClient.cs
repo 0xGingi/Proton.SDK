@@ -4,19 +4,19 @@ using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Devices;
 using Proton.Sdk.Drive.Files;
 using Proton.Sdk.Drive.Folders;
+using Proton.Sdk.Drive.Instrumentation;
 using Proton.Sdk.Drive.Links;
 using Proton.Sdk.Drive.Shares;
 using Proton.Sdk.Drive.Storage;
 using Proton.Sdk.Drive.Verification;
 using Proton.Sdk.Drive.Volumes;
-using Proton.Sdk.Instrumentation;
 
 namespace Proton.Sdk.Drive;
 
 public sealed class ProtonDriveClient
 {
-    private readonly IInstrumentFactory? _instrumentFactory;
     private readonly HttpClient _httpClient;
+    private readonly UploadAttemptRetryMonitor? _uploadAttemptRetryMonitor;
 
     /// <summary>
     /// Creates a new instance of <see cref="ProtonDriveClient"/>.
@@ -25,8 +25,10 @@ public sealed class ProtonDriveClient
     /// <param name="options">Specifies options for <see cref="ProtonDriveClient" /></param>
     public ProtonDriveClient(ProtonApiSession session, in ProtonDriveClientOptions options = default)
     {
-        _instrumentFactory = options.InstrumentFactory;
         _httpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute);
+        _uploadAttemptRetryMonitor = options.InstrumentationMeter is not null
+            ? new UploadAttemptRetryMonitor(options.InstrumentationMeter)
+            : default;
 
         ClientId = options.ClientId ?? Guid.NewGuid().ToString();
 
@@ -98,7 +100,7 @@ public sealed class ProtonDriveClient
         return FolderNode.GetFolderChildrenAsync(this, folderIdentity, includeHidden, cancellationToken);
     }
 
-    public async Task<FileUploader> WaitForFileUploaderAsync(
+    public async Task<IFileUploader> WaitForFileUploaderAsync(
         long size,
         int numberOfSamples,
         CancellationToken cancellationToken)
@@ -106,6 +108,13 @@ public sealed class ProtonDriveClient
         var expectedNumberOfBlocks = (int)size.DivideAndRoundUp(RevisionWriter.DefaultBlockSize) + numberOfSamples;
 
         await RevisionCreationSemaphore.EnterAsync(expectedNumberOfBlocks, cancellationToken).ConfigureAwait(false);
+
+        if (_uploadAttemptRetryMonitor is not null)
+        {
+            return new FileUploaderObservabilityDecorator(
+                new FileUploader(this, expectedNumberOfBlocks),
+                _uploadAttemptRetryMonitor);
+        }
 
         return new FileUploader(this, expectedNumberOfBlocks);
     }

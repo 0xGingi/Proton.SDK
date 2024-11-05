@@ -27,22 +27,14 @@ public struct ResultExtensions
             value: InteropArray.FromMemory(new StringResponse { Value = value }.ToByteArray()));
     }
 
-    internal static Result<InteropArray, InteropArray> Failure(Exception ex, int defaultCode)
+    internal static Result<InteropArray, InteropArray> Failure(Exception exception, int defaultCode)
     {
-        if (ex is ProtonApiException protonEx)
+        if (exception is ProtonApiException protonApiException)
         {
-            return Failure((int)protonEx.Code, protonEx.Message);
+            return Failure((int)protonApiException.Code, protonApiException.Message);
         }
-        else
-        {
-            return Failure(defaultCode, ex.Message);
-        }
-    }
 
-    private static Result<InteropArray, InteropArray> Failure(int code, string message)
-    {
-        return new Result<InteropArray, InteropArray>(
-            error: InteropArray.FromMemory(new Error { PrimaryCode = code, Message = message }.ToByteArray()));
+        return Failure(defaultCode, exception.Message);
     }
 
     internal static Result<InteropArray, InteropArray> Failure(Exception exception)
@@ -50,5 +42,11 @@ public struct ResultExtensions
         var error = exception.ToInteropError();
 
         return new Result<InteropArray, InteropArray>(error: InteropArray.FromMemory(error.ToByteArray()));
+    }
+
+    private static Result<InteropArray, InteropArray> Failure(int code, string message)
+    {
+        return new Result<InteropArray, InteropArray>(
+            error: InteropArray.FromMemory(new Error { PrimaryCode = code, Message = message }.ToByteArray()));
     }
 }

@@ -1,13 +1,16 @@
-﻿using System.Collections.ObjectModel;
+﻿using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
+using System.Text.Json.Nodes;
 using Proton.Sdk.Instrumentation.Extensions;
+using Proton.Sdk.Instrumentation.Metrics;
 
-namespace Proton.Sdk.Instrumentation.Observability;
+namespace Proton.Sdk.Instrumentation.Provider;
 
-public sealed class ObservabilityService : IInstrumentFactory, IObservabilityService
+public sealed class ObservabilityService : Meter, IObservabilityService
 {
     private readonly ObservabilityApiClient _observabilityApiClient;
     private readonly TimeSpan _period;
-    private readonly List<CounterDefinition> _counterDefinitions = new(capacity: 16);
+    private readonly ConcurrentBag<InstrumentRegistration> _instrumentRegistrations = new();
 
     private CancellationTokenSource _cancellationTokenSource = new();
     private PeriodicTimer _timer;
@@ -18,6 +21,13 @@ public sealed class ObservabilityService : IInstrumentFactory, IObservabilitySer
         _observabilityApiClient = new ObservabilityApiClient(session.GetHttpClient(ProtonInstrumentationDefaults.ObservabilityBaseRoute));
         _period = JitterGenerator.ApplyJitter(ProtonInstrumentationDefaults.DefaultReportingInterval, 0.2);
         _timer = new PeriodicTimer(_period);
+    }
+
+    public static ObservabilityService StartNew(ProtonApiSession session)
+    {
+        var service = new ObservabilityService(session);
+        service.Start();
+        return service;
     }
 
     public void Start()
@@ -48,10 +58,10 @@ public sealed class ObservabilityService : IInstrumentFactory, IObservabilitySer
         await SendMetricsAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    ICounter IInstrumentFactory.CreateCounter(string name, int version, object labels)
+    public override ICounter CreateCounter(string name, int version, JsonNode labels)
     {
         var counter = new Counter();
-        _counterDefinitions.Add(new CounterDefinition(name, version, labels, counter));
+        _instrumentRegistrations.Add(new InstrumentRegistration(name, version, labels, counter));
         return counter;
     }
 
@@ -72,37 +82,53 @@ public sealed class ObservabilityService : IInstrumentFactory, IObservabilitySer
 
     private async Task SendMetricsAsync(CancellationToken cancellationToken)
     {
-        var uploadMetrics = GetMetrics();
-
-        if (uploadMetrics.Count == 0)
+        try
         {
-            return;
+            var uploadMetrics = GetObservabilityMetrics();
+
+            if (uploadMetrics.Count == 0)
+            {
+                return;
+            }
+
+            var metrics = new ObservabilityMetricsParameters(uploadMetrics);
+
+            await _observabilityApiClient.SendMetricsAsync(metrics, cancellationToken).ConfigureAwait(false);
         }
-
-        var metrics = new ObservabilityMetricsParameters(uploadMetrics);
-
-        await _observabilityApiClient.SendMetricsAsync(metrics, cancellationToken).ConfigureAwait(false);
-
-        ResetCounters();
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Ignore failure
+        }
+        finally
+        {
+            ResetInstruments();
+        }
     }
 
-    private ReadOnlyCollection<ObservabilityMetric> GetMetrics()
+    private ReadOnlyCollection<ObservabilityMetricDto> GetObservabilityMetrics()
     {
-        return _counterDefinitions
-            .ConvertAll(
-                c => new ObservabilityMetric(
+        var result = _instrumentRegistrations
+            .Where(x => x.Instrument is Counter { Value: > 0 })
+            .Select(
+                c => new ObservabilityMetricDto(
                     c.Name,
                     c.Version,
                     DateTime.UtcNow.ToUnixTimeSeconds(),
-                    new ObservabilityMetricProperties(c.Counter.Value, c.Labels)))
-            .AsReadOnly();
+                    new ObservabilityMetricPropertiesDto(((Counter)c.Instrument).Value, c.Labels)))
+            .ToList();
+
+        return result.Count > 0 ? new ReadOnlyCollection<ObservabilityMetricDto>(result) : ReadOnlyCollection<ObservabilityMetricDto>.Empty;
     }
 
-    private void ResetCounters()
+    private void ResetInstruments()
     {
-        foreach (var counterDefinition in _counterDefinitions)
+        foreach (var meter in _instrumentRegistrations)
         {
-            counterDefinition.Counter.Reset();
+            meter.Instrument.Reset();
         }
     }
 }

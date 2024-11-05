@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Proton.Sdk.CExports;
-using Proton.Sdk.Instrumentation.Observability;
+using Proton.Sdk.Instrumentation.Provider;
 
 namespace Proton.Sdk.Instrumentation.CExport;
 
@@ -28,6 +28,28 @@ internal static class InteropProtonObservabilityService
             }
 
             var client = new ObservabilityService(session);
+
+            *clientHandle = GCHandle.ToIntPtr(GCHandle.Alloc(client));
+
+            return 0;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "observability_service_start_new", CallConvs = [typeof(CallConvCdecl)])]
+    private static unsafe int CreateAndStart(nint sessionHandle, nint* clientHandle)
+    {
+        try
+        {
+            if (!InteropProtonApiSession.TryGetFromHandle(sessionHandle, out var session))
+            {
+                return -1;
+            }
+
+            var client = ObservabilityService.StartNew(session);
 
             *clientHandle = GCHandle.ToIntPtr(GCHandle.Alloc(client));
 
@@ -89,9 +111,7 @@ internal static class InteropProtonObservabilityService
                 return -1;
             }
 
-            callback.InvokeFor(ct => FlushAsync(service, ct));
-
-            return 0;
+            return callback.InvokeFor(ct => FlushAsync(service, ct));
         }
         catch
         {
@@ -107,9 +127,9 @@ internal static class InteropProtonObservabilityService
 
             return ResultExtensions.Success();
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(exception);
         }
     }
 }

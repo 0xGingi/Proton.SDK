@@ -2,7 +2,7 @@ using Proton.Sdk.Drive.Files;
 
 namespace Proton.Sdk.Drive;
 
-public sealed class FileUploader : IDisposable
+public sealed class FileUploader : IFileUploader
 {
     private readonly ProtonDriveClient _client;
     private volatile int _remainingNumberOfBlocks;
@@ -44,8 +44,8 @@ public sealed class FileUploader : IDisposable
                     _client,
                     shareMetadata.ShareId,
                     new LinkId(ex.Response.Conflict.LinkId),
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    cancellationToken).ConfigureAwait(false);
+
             if (conflictingNode is not FileNode conflictingFile)
             {
                 throw;
@@ -59,8 +59,7 @@ public sealed class FileUploader : IDisposable
                         shareMetadata,
                         conflictingFile.NodeIdentity,
                         new RevisionId(ex.Response.Conflict.RevisionId),
-                        cancellationToken)
-                    .ConfigureAwait(false)
+                        cancellationToken).ConfigureAwait(false),
             };
         }
 
@@ -72,8 +71,7 @@ public sealed class FileUploader : IDisposable
                 samples,
                 lastModificationTime,
                 onProgress,
-                cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
 
         return fileUploadResponse.File;
     }
@@ -110,13 +108,12 @@ public sealed class FileUploader : IDisposable
                 lastModificationTime,
                 onProgress,
                 cancellationToken,
-                operationId)
-            .ConfigureAwait(false);
+                operationId).ConfigureAwait(false);
 
         return new FileUploadResponse
         {
             File = fileCreationResponse.File,
-            Revision = fileCreationResponse.Revision
+            Revision = fileCreationResponse.Revision,
         };
     }
 
@@ -137,8 +134,7 @@ public sealed class FileUploader : IDisposable
                 fileIdentity,
                 lastKnownRevisionId,
                 cancellationToken,
-                operationId)
-            .ConfigureAwait(false);
+                operationId).ConfigureAwait(false);
 
         await UploadAsync(
                 shareMetadata,
@@ -149,8 +145,7 @@ public sealed class FileUploader : IDisposable
                 lastModificationTime,
                 onProgress,
                 cancellationToken,
-                operationId)
-            .ConfigureAwait(false);
+                operationId).ConfigureAwait(false);
 
         return revision;
     }

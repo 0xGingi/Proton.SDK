@@ -1,6 +1,6 @@
-﻿namespace Proton.Sdk.Instrumentation;
+﻿namespace Proton.Sdk.Instrumentation.Metrics;
 
-internal sealed class Counter : ICounter
+internal sealed class Counter : Instrument, ICounter
 {
     private int _value;
 
@@ -11,7 +11,7 @@ internal sealed class Counter : ICounter
         Interlocked.Increment(ref _value);
     }
 
-    public void Reset()
+    public override void Reset()
     {
         Interlocked.Exchange(ref _value, 0);
     }

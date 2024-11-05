@@ -1,4 +1,4 @@
-﻿namespace Proton.Sdk.Instrumentation;
+﻿namespace Proton.Sdk.Instrumentation.Metrics;
 
 public interface ICounter
 {

@@ -32,7 +32,7 @@ internal static class InteropProtonDriveClient
                 return -1;
             }
 
-            var client = new ProtonDriveClient(session, new ProtonDriveClientOptions { InstrumentFactory = observabilityService });
+            var client = new ProtonDriveClient(session, new ProtonDriveClientOptions { InstrumentationMeter = observabilityService });
 
             *clientHandle = GCHandle.ToIntPtr(GCHandle.Alloc(client));
 

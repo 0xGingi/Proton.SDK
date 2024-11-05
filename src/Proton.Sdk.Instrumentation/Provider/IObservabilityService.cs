@@ -1,4 +1,4 @@
-﻿namespace Proton.Sdk.Instrumentation.Observability;
+﻿namespace Proton.Sdk.Instrumentation.Provider;
 
 public interface IObservabilityService
 {

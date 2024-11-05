@@ -40,6 +40,12 @@ public enum ResponseCode
     /// </summary>
     NoActiveSubscription = 22110,
 
+    ProtonDriveUnknown = 200000,
+    InsufficientQuota = ProtonDriveUnknown + 1,
+    InsufficientSpace = ProtonDriveUnknown + 2,
+    MaxFileSizeForFreeUser = ProtonDriveUnknown + 3,
+    TooManyChildren = ProtonDriveUnknown + 300,
+
     CustomCode = 10000000,
     SocketError = CustomCode + 1,
     SessionRefreshFailed = CustomCode + 3,
