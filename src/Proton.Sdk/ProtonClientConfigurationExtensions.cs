@@ -36,6 +36,11 @@ internal static class ProtonClientConfigurationExtensions
                     }
                 });
 
+                if (config.CustomHttpMessageHandlerFactory is not null)
+                {
+                    builder.AddHttpMessageHandler(() => config.CustomHttpMessageHandlerFactory.Invoke());
+                }
+
                 builder.AddStandardResilienceHandler(
                     options =>
                     {

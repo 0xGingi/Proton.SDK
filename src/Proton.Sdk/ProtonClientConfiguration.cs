@@ -13,4 +13,5 @@ internal sealed class ProtonClientConfiguration(ProtonClientOptions options)
     public bool IgnoreSslCertificateErrors { get; } = options.HasIgnoreSslCertificateErrors && options.IgnoreSslCertificateErrors;
     public ISecretsCache SecretsCache { get; } = options.SecretsCache ?? new InMemorySecretsCache();
     public ILoggerFactory LoggerFactory { get; } = options.LoggerFactory ?? NullLoggerFactory.Instance;
+    public Func<DelegatingHandler>? CustomHttpMessageHandlerFactory { get; } = options.CustomHttpMessageHandlerFactory;
 }

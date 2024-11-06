@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="$(AssemblyName).Drive" />
+    <InternalsVisibleTo Include="$(AssemblyName).Instrumentation" />
     <InternalsVisibleTo Include="$(AssemblyName).Tests" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
