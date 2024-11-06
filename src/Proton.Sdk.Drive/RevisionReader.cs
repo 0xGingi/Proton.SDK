@@ -10,8 +10,7 @@ public sealed class RevisionReader : IDisposable
     public const int MinBlockIndex = 1;
 
     private readonly ProtonDriveClient _client;
-    private readonly ShareId _shareId;
-    private readonly INodeIdentity _file;
+    private readonly INodeIdentity _fileIdentity;
     private readonly IRevisionForTransfer _revision;
     private readonly PgpSessionKey _contentKey;
     private readonly RevisionResponse _revisionResponse;
@@ -20,15 +19,13 @@ public sealed class RevisionReader : IDisposable
 
     internal RevisionReader(
         ProtonDriveClient client,
-        ShareId shareId,
-        INodeIdentity file,
+        INodeIdentity fileIdentity,
         IRevisionForTransfer revision,
         PgpSessionKey contentKey,
         RevisionResponse revisionResponse)
     {
         _client = client;
-        _shareId = shareId;
-        _file = file;
+        _fileIdentity = fileIdentity;
         _revision = revision;
         _contentKey = contentKey;
         _revisionResponse = revisionResponse;
@@ -209,9 +206,9 @@ public sealed class RevisionReader : IDisposable
             {
                 revisionResponse =
                     await _client.FilesApi.GetRevisionAsync(
-                        _shareId,
-                        _file.Id,
-                        _revision.Id,
+                        _fileIdentity.ShareId,
+                        _fileIdentity.NodeId,
+                        _revision.RevisionId,
                         lastKnownIndex + 1,
                         BlockPageSize,
                         false,
@@ -246,7 +243,7 @@ public sealed class RevisionReader : IDisposable
             return PgpVerificationStatus.NoVerifier;
         }
 
-        var verificationResult = new PgpKeyRing(verificationKeys).Verify(manifestStream, _revision.ManifestSignature.Value.Span);
+        var verificationResult = new PgpKeyRing(verificationKeys).Verify(manifestStream, _revision.ManifestSignature.Span);
 
         return verificationResult.Status;
     }

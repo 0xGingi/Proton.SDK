@@ -5,36 +5,43 @@ using Proton.Sdk.Drive.Shares;
 
 namespace Proton.Sdk.Drive;
 
-public sealed class Share(ShareId id, VolumeId volumeId, LinkId rootNodeId, AddressId membershipAddressId, string membershipEmailAddress) : IShareForCommand
+public sealed partial class Share : IShare
 {
     private const string CacheValueHolderName = "drive.share";
     private const string CacheShareKeyValueName = "key";
 
-    public VolumeId VolumeId { get; } = volumeId;
-
-    public ShareId Id { get; } = id;
-
-    public LinkId RootNodeId { get; } = rootNodeId;
-
-    public AddressId MembershipAddressId { get; } = membershipAddressId;
-
-    public string MembershipEmailAddress { get; } = membershipEmailAddress;
-
-    internal static async Task<Share> GetAsync(ProtonDriveClient client, ShareId id, CancellationToken cancellationToken)
+    public ShareMetadata Metadata()
     {
-        var response = await client.SharesApi.GetShareAsync(id, cancellationToken).ConfigureAwait(false);
+        return new ShareMetadata
+        {
+            ShareId = ShareId,
+            MembershipEmailAddress = MembershipEmailAddress,
+            MembershipAddressId = MembershipAddressId,
+        };
+    }
 
-        var addressId = new AddressId(response.AddressId);
+    internal static async Task<Share> GetAsync(ProtonDriveClient client, ShareId shareId, CancellationToken cancellationToken)
+    {
+        var fetchedShare = await client.SharesApi.GetShareAsync(shareId, cancellationToken).ConfigureAwait(false);
+
+        var addressId = new AddressId(fetchedShare.AddressId);
         var addressKeys = await client.Account.GetAddressKeysAsync(addressId, cancellationToken).ConfigureAwait(false);
 
-        var passphrase = new PgpPrivateKeyRing(addressKeys).Decrypt(response.Passphrase);
+        var passphrase = new PgpPrivateKeyRing(addressKeys).Decrypt(fetchedShare.Passphrase);
 
-        var key = PgpPrivateKey.ImportAndUnlock(response.Key, passphrase);
-        client.SecretsCache.Set(GetShareKeyCacheKey(id), key.ToBytes());
+        var key = PgpPrivateKey.ImportAndUnlock(fetchedShare.Key, passphrase);
+        client.SecretsCache.Set(GetShareKeyCacheKey(shareId), key.ToBytes());
 
-        var address = await client.Account.GetAddressAsync(new AddressId(response.AddressId), cancellationToken).ConfigureAwait(false);
+        var fetchedAddress = await client.Account.GetAddressAsync(addressId, cancellationToken).ConfigureAwait(false);
 
-        return new Share(id, new VolumeId(response.VolumeId), new LinkId(response.RootLinkId), address.Id, address.EmailAddress);
+        return new Share
+        {
+            ShareId = shareId,
+            VolumeId = new VolumeId(fetchedShare.VolumeId),
+            RootNodeId = new LinkId(fetchedShare.RootLinkId),
+            MembershipAddressId = fetchedAddress.Id,
+            MembershipEmailAddress = fetchedAddress.EmailAddress,
+        };
     }
 
     internal static async Task DeleteFromTrashAsync(SharesApiClient client, ShareId shareId, IEnumerable<LinkId> nodeIds, CancellationToken cancellationToken)

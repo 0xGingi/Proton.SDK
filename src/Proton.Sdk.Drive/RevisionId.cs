@@ -1,11 +1,7 @@
 ﻿namespace Proton.Sdk.Drive;
 
-public readonly record struct RevisionId(string Value)
+public sealed partial class RevisionId : IFormattableValue
 {
-    internal string Value { get; } = Value;
-
-    public override string ToString()
-    {
-        return Value;
-    }
+    public RevisionId(string str)
+        : this(new RevisionId { Value = str }) { }
 }

@@ -2,6 +2,7 @@
 
 public interface INodeIdentity
 {
+    LinkId NodeId { get; }
     VolumeId VolumeId { get; }
-    LinkId Id { get; }
+    ShareId ShareId { get; }
 }

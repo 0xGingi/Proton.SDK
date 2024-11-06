@@ -2,7 +2,7 @@
 
 public interface IShareForCommand
 {
-    ShareId Id { get; }
+    ShareId ShareId { get; }
     AddressId MembershipAddressId { get; }
     string MembershipEmailAddress { get; }
 }

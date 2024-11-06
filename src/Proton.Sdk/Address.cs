@@ -72,7 +72,7 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
     {
         int? primaryKeyIndex = null;
 
-        var id = new AddressId(dto.Id);
+        var addressId = new AddressId(dto.Id);
 
         var keys = new List<AddressKey>(dto.Keys.Count);
         var addressKeyCacheKeys = new CacheKey[dto.Keys.Count];
@@ -85,7 +85,7 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
                 continue;
             }
 
-            var keyId = new AddressKeyId(keyDto.Id);
+            var addressKeyId = new AddressKeyId(keyDto.Id);
 
             try
             {
@@ -97,7 +97,7 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
                     unlockedKey = PgpPrivateKey.ImportAndUnlock(keyDto.PrivateKey, passphrase.Span);
                 }
                 else if (!secretsCache.TryUse(
-                    ProtonApiSession.GetLegacyAddressKeyPassphraseCacheKey(keyId),
+                    ProtonApiSession.GetLegacyAddressKeyPassphraseCacheKey(addressKeyId),
                     (passphrase, _) => PgpPrivateKey.ImportAndUnlock(keyDto.PrivateKey, passphrase),
                     out unlockedKey))
                 {
@@ -105,7 +105,7 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
                     continue;
                 }
 
-                var addressKeyCacheKey = GetAddressKeyCacheKey(keyId);
+                var addressKeyCacheKey = GetAddressKeyCacheKey(addressKeyId);
                 secretsCache.Set(addressKeyCacheKey, unlockedKey.ToBytes(), keyDto.IsPrimary ? (byte)1 : (byte)0);
                 addressKeyCacheKeys[keyIndex] = addressKeyCacheKey;
             }
@@ -115,7 +115,13 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
                 continue;
             }
 
-            var key = new AddressKey(id, keyId, (keyDto.Flags & AddressKeyFlags.IsAllowedForEncryption) > 0);
+            var key = new AddressKey
+            {
+                AddressId = addressId,
+                AddressKeyId = addressKeyId,
+                // FIXME: Check flag
+                IsAllowedForEncryption = (keyDto.Flags & AddressKeyFlags.IsAllowedForEncryption) > 0
+            };
 
             keys.Add(key);
 
@@ -132,9 +138,9 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
             throw new ProtonApiException($"Address {dto.Id} has no primary key");
         }
 
-        secretsCache.IncludeInGroup(GetAddressKeyGroupCacheKey(id), addressKeyCacheKeys.AsSpan()[..keys.Count]);
+        secretsCache.IncludeInGroup(GetAddressKeyGroupCacheKey(addressId), addressKeyCacheKeys.AsSpan()[..keys.Count]);
 
-        return new Address(id, dto.Order, dto.Email, dto.Status, keys.AsReadOnly(), primaryKeyIndex.Value);
+        return new Address(addressId, dto.Order, dto.Email, dto.Status, keys.AsReadOnly(), primaryKeyIndex.Value);
     }
 
     internal static async Task<IReadOnlyList<PgpPrivateKey>> GetKeysAsync(

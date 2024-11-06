@@ -2,7 +2,7 @@
 
 namespace Proton.Sdk.Drive.Files;
 
-internal sealed class FileCreationResponse : ApiResponse
+internal sealed class FileCreationApiResponse : ApiResponse
 {
     [JsonPropertyName("File")]
     public required RevisionIdentity RevisionIdentity { get; init; }

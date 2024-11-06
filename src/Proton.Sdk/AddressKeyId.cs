@@ -1,11 +1,7 @@
 ﻿namespace Proton.Sdk;
 
-public readonly struct AddressKeyId(string value)
+public sealed partial class AddressKeyId : IFormattableValue
 {
-    internal string Value { get; } = value;
-
-    public override string ToString()
-    {
-        return Value;
-    }
+    public AddressKeyId(string str)
+        : this(new AddressKeyId { Value = str }) { }
 }

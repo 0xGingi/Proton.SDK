@@ -1,11 +1,7 @@
 ﻿namespace Proton.Sdk.Drive;
 
-public readonly record struct LinkId(string Value)
+public sealed partial class LinkId : IFormattableValue
 {
-    internal string Value { get; } = Value;
-
-    public override string ToString()
-    {
-        return Value;
-    }
+    public LinkId(string str)
+        : this(new LinkId { Value = str }) { }
 }

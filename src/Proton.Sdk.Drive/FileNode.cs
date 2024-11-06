@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Google.Protobuf;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Files;
@@ -6,42 +7,55 @@ using Proton.Sdk.Drive.Serialization;
 
 namespace Proton.Sdk.Drive;
 
-public sealed class FileNode(VolumeId volumeId, LinkId id, LinkId? parentId, string name, ReadOnlyMemory<byte> nameHashDigest, NodeState state)
-    : Node(volumeId, id, parentId, name, nameHashDigest, state)
-{
+public sealed partial class FileNode : INode
+    {
     internal FileNode(
-        VolumeId volumeId,
-        LinkId id,
+        NodeIdentity nodeIdentity,
         LinkId? parentId,
         string name,
-        ReadOnlyMemory<byte> nameHashDigest,
+        ByteString nameHashDigest,
         NodeState state,
         (RevisionDto Properties, ExtendedAttributes ExtendedAttributes)? activeRevision = null)
-        : this(volumeId, id, parentId, name, nameHashDigest, state)
     {
+        NodeIdentity = nodeIdentity;
+        ParentId = parentId;
+        Name = name;
+        NameHashDigest = nameHashDigest;
+        State = state;
+
         if (activeRevision is not null)
         {
             var (activeRevisionProperties, extendedAttributes) = activeRevision.Value;
-            ActiveRevision = new Revision(volumeId, id, activeRevisionProperties, extendedAttributes);
+            ActiveRevision = new Revision(nodeIdentity.VolumeId, nodeIdentity.NodeId, activeRevisionProperties, extendedAttributes);
         }
     }
 
-    public Revision? ActiveRevision { get; }
-
-    internal static async Task<(FileNode File, Revision DraftRevision)> CreateAsync(
+    internal static async Task<FileCreationResponse> CreateFileAsync(
         ProtonDriveClient client,
-        IShareForCommand share,
-        INodeIdentity parentFolder,
-        string name,
-        string mediaType,
+        FileCreationRequest fileCreationRequest,
         CancellationToken cancellationToken)
     {
-        var parentFolderKey = await GetKeyAsync(client, share.Id, parentFolder.VolumeId, parentFolder.Id, cancellationToken).ConfigureAwait(false);
-        var signingKey = await client.Account.GetAddressPrimaryKeyAsync(share.MembershipAddressId, cancellationToken).ConfigureAwait(false);
-        var parentFolderHashKey = await GetHashKeyAsync(client, share.Id, parentFolder.VolumeId, parentFolder.Id, cancellationToken).ConfigureAwait(false);
+        var parentNodeIdentity = new NodeIdentity
+        {
+            NodeId = fileCreationRequest.ParentFolderIdentity.NodeId,
+            VolumeId = fileCreationRequest.ParentFolderIdentity.VolumeId,
+            ShareId = fileCreationRequest.ShareMetadata.ShareId,
+        };
+        var parentFolderKey = await Node.GetKeyAsync(client, parentNodeIdentity, cancellationToken).ConfigureAwait(false);
 
-        GetCommonCreationParameters(
-            name,
+        var signingKey = await client.Account.GetAddressPrimaryKeyAsync(
+            fileCreationRequest.ShareMetadata.MembershipAddressId,
+            cancellationToken
+        ).ConfigureAwait(false);
+
+        var parentFolderHashKey = await Node.GetHashKeyAsync(
+                client,
+                parentNodeIdentity,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        Node.GetCommonCreationParameters(
+            fileCreationRequest.Name,
             parentFolderKey,
             parentFolderHashKey.Span,
             signingKey,
@@ -61,53 +75,74 @@ public sealed class FileNode(VolumeId volumeId, LinkId id, LinkId? parentId, str
         {
             Name = encryptedName,
             NameHashDigest = nameHashDigest,
-            ParentLinkId = parentFolder.Id.Value,
+            ParentLinkId = fileCreationRequest.ParentFolderIdentity.NodeId.Value,
             Passphrase = encryptedKeyPassphrase,
             PassphraseSignature = passphraseSignature,
-            SignatureEmailAddress = share.MembershipEmailAddress,
+            SignatureEmailAddress = fileCreationRequest.ShareMetadata.MembershipEmailAddress,
             Key = lockedKeyBytes,
-            MediaType = mediaType,
+            MediaType = fileCreationRequest.MimeType,
             ContentKeyPacket = key.EncryptSessionKey(contentKey),
             ContentKeyPacketSignature = key.Sign(contentKeyToken),
         };
 
-        LinkId id;
-        RevisionId revisionId;
+        LinkId createdNodeId;
+        RevisionId createdRevisionId;
         try
         {
-            var response = await client.FilesApi.CreateFileAsync(share.Id, parameters, cancellationToken).ConfigureAwait(false);
-
-            id = new LinkId(response.RevisionIdentity.LinkId);
-            revisionId = new RevisionId(response.RevisionIdentity.RevisionId);
+            var response = await client.FilesApi.CreateFileAsync(parentNodeIdentity.ShareId, parameters, cancellationToken).ConfigureAwait(false);
+            createdNodeId = new LinkId(response.RevisionIdentity.LinkId);
+            createdRevisionId = new RevisionId(response.RevisionIdentity.RevisionId);
         }
         catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { DraftClientId: not null, DraftRevisionId: not null } })
         {
-            if (ex.Response.Conflict.DraftClientId != client.Id)
+            if (ex.Response.Conflict.DraftClientId != client.ClientId)
             {
                 throw;
             }
 
-            id = new LinkId(ex.Response.Conflict.LinkId);
-            revisionId = new RevisionId(ex.Response.Conflict.DraftRevisionId);
+            createdNodeId = new LinkId(ex.Response.Conflict.LinkId);
+            createdRevisionId = new RevisionId(ex.Response.Conflict.DraftRevisionId);
         }
 
-        client.SecretsCache.Set(GetNodeKeyCacheKey(parentFolder.VolumeId, id), key.ToBytes());
-        client.SecretsCache.Set(GetNameSessionKeyCacheKey(parentFolder.VolumeId, id), nameSessionKey.Export().Token);
-        client.SecretsCache.Set(GetPassphraseSessionKeyCacheKey(parentFolder.VolumeId, id), passphraseSessionKey.Export().Token);
-        client.SecretsCache.Set(GetContentKeyCacheKey(parentFolder.VolumeId, id), contentKeyToken);
+        client.SecretsCache.Set(Node.GetNodeKeyCacheKey(parentNodeIdentity.VolumeId, createdNodeId), key.ToBytes());
+        client.SecretsCache.Set(Node.GetNameSessionKeyCacheKey(parentNodeIdentity.VolumeId, createdNodeId), nameSessionKey.Export().Token);
+        client.SecretsCache.Set(Node.GetPassphraseSessionKeyCacheKey(parentNodeIdentity.VolumeId, createdNodeId), passphraseSessionKey.Export().Token);
+        client.SecretsCache.Set(Node.GetContentKeyCacheKey(parentNodeIdentity.VolumeId, createdNodeId), contentKeyToken);
 
-        var file = new FileNode(parentFolder.VolumeId, id, parentFolder.Id, name, nameHashDigest, NodeState.Draft);
+        var file = new FileNode
+        {
+            NodeIdentity = new NodeIdentity
+            {
+                VolumeId = parentNodeIdentity.VolumeId,
+                NodeId = createdNodeId,
+                ShareId = parentNodeIdentity.ShareId,
+            },
+            ParentId = fileCreationRequest.ParentFolderIdentity.NodeId,
+            Name = fileCreationRequest.Name,
+            NameHashDigest = ByteString.CopyFrom(nameHashDigest),
+            State = NodeState.Draft,
+        };
 
-        var draftRevision = new Revision(file.VolumeId, id, revisionId, RevisionState.Draft, 0, default);
+        var draftRevision = new Revision(
+            file.NodeIdentity.VolumeId,
+            createdNodeId,
+            createdRevisionId,
+            RevisionState.Draft,
+            0,
+            default);
 
-        return (file, draftRevision);
+        return new FileCreationResponse
+        {
+            File = file,
+            Revision = draftRevision,
+        };
     }
 
-    internal static async Task<Revision[]> GetRevisionsAsync(ProtonDriveClient client, ShareId shareId, INodeIdentity file, CancellationToken cancellationToken)
+    internal static async Task<Revision[]> GetFileRevisionsAsync(ProtonDriveClient client, INodeIdentity fileNodeIdentity, CancellationToken cancellationToken)
     {
-        var fileKey = await GetKeyAsync(client, shareId, file.VolumeId, file.Id, cancellationToken).ConfigureAwait(false);
+        var fileKey = await Node.GetKeyAsync(client, fileNodeIdentity, cancellationToken).ConfigureAwait(false);
 
-        var response = await client.FilesApi.GetRevisionsAsync(shareId, file.Id, cancellationToken).ConfigureAwait(false);
+        var response = await client.FilesApi.GetRevisionsAsync(fileNodeIdentity.ShareId, fileNodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
         return response.Revisions.Select(
             dto =>
@@ -117,20 +152,20 @@ public sealed class FileNode(VolumeId volumeId, LinkId id, LinkId? parentId, str
                     ? JsonSerializer.Deserialize(fileKey.Decrypt(dto.ExtendedAttributes.Value), ProtonDriveApiSerializerContext.Default.ExtendedAttributes)
                     : default;
 
-                return new Revision(file.VolumeId, file.Id, dto, extendedAttributes);
+                return new Revision(fileNodeIdentity.VolumeId, fileNodeIdentity.NodeId, dto, extendedAttributes);
             }).ToArray();
     }
 
-    internal static async Task<Revision> GetRevisionAsync(
+    internal static async Task<Revision> GetFileRevisionAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        INodeIdentity file,
+        NodeIdentity fileNodeIdentity,
         RevisionId revisionId,
         CancellationToken cancellationToken)
     {
-        var fileKey = await GetKeyAsync(client, shareId, file.VolumeId, file.Id, cancellationToken).ConfigureAwait(false);
+        var fileKey = await Node.GetKeyAsync(client, fileNodeIdentity, cancellationToken).ConfigureAwait(false);
 
-        var response = await client.FilesApi.GetRevisionAsync(shareId, file.Id, revisionId, 1, 1, true, cancellationToken).ConfigureAwait(false);
+        var response = await client.FilesApi.GetRevisionAsync(fileNodeIdentity.ShareId, fileNodeIdentity.NodeId, revisionId, 1, 1, true, cancellationToken)
+            .ConfigureAwait(false);
 
         // TODO: verify signature
         var extendedAttributes = response.Revision.ExtendedAttributes is not null
@@ -139,29 +174,31 @@ public sealed class FileNode(VolumeId volumeId, LinkId id, LinkId? parentId, str
                 ProtonDriveApiSerializerContext.Default.ExtendedAttributes)
             : default;
 
-        return new Revision(file.VolumeId, file.Id, response.Revision, extendedAttributes);
+        return new Revision(
+            fileNodeIdentity.VolumeId,
+            fileNodeIdentity.NodeId,
+            response.Revision,
+            extendedAttributes);
     }
 
-    internal static async Task<PgpSessionKey> GetContentKeyAsync(
+    internal static async Task<PgpSessionKey> GetFileContentKeyAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        VolumeId volumeId,
-        LinkId id,
+        INodeIdentity nodeIdentity,
         CancellationToken cancellationToken)
     {
         if (!client.SecretsCache.TryUse(
-            GetContentKeyCacheKey(volumeId, id),
+            Node.GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
             (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
             out var nameKey))
         {
-            await GetAsync(client, shareId, id, cancellationToken).ConfigureAwait(false);
+            await Node.GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
             if (!client.SecretsCache.TryUse(
-                GetContentKeyCacheKey(volumeId, id),
+                Node.GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
                 (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
                 out nameKey))
             {
-                throw new ProtonApiException($"Could not get content key for {id}");
+                throw new ProtonApiException($"Could not get content key for {nodeIdentity.NodeId}");
             }
         }
 

@@ -20,10 +20,11 @@ internal sealed class InteropLogger(InteropLogCallback logCallback, string categ
 
     public unsafe void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        var message = formatter.Invoke(state, exception);
-        var logEvent = new InteropLogEvent((byte)logLevel, InteropArray.Utf8FromString(message), InteropArray.Utf8FromString(_categoryName));
-
-        _logCallback.Invoke(_logCallback.State, logEvent);
+        // FIXME: Bring back when merging with other branches
+    //     var message = formatter.Invoke(state, exception);
+    //     var logEvent = new InteropLogEvent((byte)logLevel, InteropArray.Utf8FromString(message), InteropArray.Utf8FromString(_categoryName));
+    //
+    //     _logCallback.Invoke(_logCallback.State, logEvent);
     }
 
     public bool IsEnabled(LogLevel logLevel)

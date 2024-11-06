@@ -11,6 +11,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" />
     <PackageReference Include="Proton.Cryptography" PrivateAssets="compile" />
+    <PackageReference Include="Grpc.Tools">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +26,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Proton.Sdk\Proton.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="../../protos/drive_types.proto" />
   </ItemGroup>
 
 </Project>

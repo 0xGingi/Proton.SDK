@@ -2,15 +2,7 @@
 
 internal static class InteropAsyncCallbackExtensions
 {
-    public static unsafe void InvokeFor(this InteropAsyncCallbackNoCancellation callback, Func<ValueTask<Result<SdkError>>> asyncFunction)
-    {
-        Use(
-            () => callback.OnSuccess(callback.State),
-            error => callback.OnFailure(callback.State, InteropSdkError.FromManaged(error)),
-            asyncFunction);
-    }
-
-    public static unsafe int InvokeFor<T>(this InteropAsyncCallback<T> callback, Func<CancellationToken, ValueTask<Result<T, SdkError>>> asyncFunction)
+    public static unsafe int InvokeFor(this InteropAsyncCallback callback, Func<CancellationToken, ValueTask<Result<InteropArray, InteropArray>>> asyncFunction)
     {
         if (!InteropCancellationTokenSource.TryGetTokenFromHandle(callback.CancellationTokenSourceHandle, out var cancellationToken))
         {
@@ -19,30 +11,17 @@ internal static class InteropAsyncCallbackExtensions
 
         Use(
             value => callback.OnSuccess(callback.State, value),
-            error => callback.OnFailure(callback.State, InteropSdkError.FromManaged(error)),
+            error => callback.OnFailure(callback.State, error),
             asyncFunction,
             cancellationToken);
 
         return 0;
     }
 
-    private static async void Use(Action onSuccess, Action<SdkError> onFailure, Func<ValueTask<Result<SdkError>>> asyncFunction)
-    {
-        var result = await asyncFunction.Invoke().ConfigureAwait(false);
-
-        if (result.TryGetError(out var error))
-        {
-            onFailure(error);
-            return;
-        }
-
-        onSuccess();
-    }
-
     private static async void Use<T>(
         Action<T> onSuccess,
-        Action<SdkError> onFailure,
-        Func<CancellationToken, ValueTask<Result<T, SdkError>>> asyncFunction,
+        Action<T> onFailure,
+        Func<CancellationToken, ValueTask<Result<T, T>>> asyncFunction,
         CancellationToken cancellationToken)
     {
         var result = await asyncFunction.Invoke(cancellationToken).ConfigureAwait(false);

@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Google.Protobuf;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Files;
@@ -10,7 +11,7 @@ using Proton.Sdk.Drive.Serialization;
 
 namespace Proton.Sdk.Drive;
 
-public abstract class Node : INodeForMove
+public partial class Node : INode
 {
     private const int PassphraseRandomBytesLength = 32;
 
@@ -23,41 +24,38 @@ public abstract class Node : INodeForMove
     private const string CacheContentKeyValueName = "content-key";
 
     internal Node(
-        VolumeId volumeId,
-        LinkId id,
+        NodeIdentity nodeIdentity,
         LinkId? parentId,
         string name,
-        ReadOnlyMemory<byte> nameHashDigest,
+        ByteString nameHashDigest,
         NodeState state)
     {
-        VolumeId = volumeId;
-        Id = id;
+        NodeIdentity = nodeIdentity;
         ParentId = parentId;
         Name = name;
         State = state;
         NameHashDigest = nameHashDigest;
     }
 
-    public VolumeId VolumeId { get; }
+    protected Node()
+    {
+        throw new NotImplementedException();
+    }
 
-    public LinkId Id { get; }
-
+    public NodeIdentity NodeIdentity { get; }
     public LinkId? ParentId { get; }
-
     public string Name { get; }
-
+    public ByteString NameHashDigest { get; }
     public NodeState State { get; }
 
-    public ReadOnlyMemory<byte> NameHashDigest { get; }
-
-    internal static async Task<Node> GetAsync(ProtonDriveClient client, ShareId shareId, LinkId itemId, CancellationToken cancellationToken)
+    internal static async Task<INode> GetAsync(ProtonDriveClient client, ShareId shareId, LinkId itemId, CancellationToken cancellationToken)
     {
         var response = await client.LinksApi.GetLinkAsync(shareId, itemId, cancellationToken).ConfigureAwait(false);
 
         return await GetAsync(client, shareId, response.Link, cancellationToken).ConfigureAwait(false);
     }
 
-    internal static async Task<Node> GetAsync(ProtonDriveClient client, ShareId shareId, Link link, CancellationToken cancellationToken)
+    internal static async Task<INode> GetAsync(ProtonDriveClient client, ShareId shareId, Link link, CancellationToken cancellationToken)
     {
         using var parentKey = await GetParentKeyAsync(client, shareId, link, cancellationToken).ConfigureAwait(false);
 
@@ -67,67 +65,71 @@ public abstract class Node : INodeForMove
     internal static async Task MoveAsync(
         ProtonDriveClient client,
         ShareId shareId,
-        INodeForMove node,
-        LinkId parentFolderId,
+        INode node,
         IShareForCommand destinationShare,
-        INodeIdentity destinationParentFolder,
+        INodeIdentity destinationFolderIdentity,
         string nameAtDestination,
         CancellationToken cancellationToken)
     {
         using var signingKey = await client.Account.GetAddressPrimaryKeyAsync(destinationShare.MembershipAddressId, cancellationToken).ConfigureAwait(false);
-        using var nameSessionKey = await GetNameSessionKeyAsync(client, shareId, node.VolumeId, node.Id, cancellationToken).ConfigureAwait(false);
+        var nodeIdentity = new NodeIdentity { ShareId = shareId, VolumeId = node.NodeIdentity.VolumeId, NodeId = node.NodeIdentity.NodeId };
+        var destinationNodeIdentity = new NodeIdentity { ShareId = shareId, VolumeId = destinationFolderIdentity.VolumeId, NodeId = destinationFolderIdentity.NodeId };
+
+        using var nameSessionKey = await GetNameSessionKeyAsync(client, nodeIdentity, cancellationToken).ConfigureAwait(false);
 
         using var passphraseSessionKey =
-            await GetPassphraseSessionKeyAsync(client, shareId, node.VolumeId, node.Id, cancellationToken).ConfigureAwait(false);
+            await GetPassphraseSessionKeyAsync(client, nodeIdentity, cancellationToken).ConfigureAwait(false);
 
-        using var destinationParentFolderKey = await GetKeyAsync(
+        using var destinationFolderKey = await GetKeyAsync(
             client,
-            shareId,
-            destinationParentFolder.VolumeId,
-            destinationParentFolder.Id,
+            destinationNodeIdentity,
             cancellationToken).ConfigureAwait(false);
 
-        var destinationParentHashKey = await GetHashKeyAsync(client, shareId, node.VolumeId, destinationParentFolder.Id, cancellationToken)
+        var destinationFolderHashKey = await GetHashKeyAsync(client, destinationFolderIdentity, cancellationToken)
             .ConfigureAwait(false);
 
         GetNameParameters(
             nameAtDestination,
-            destinationParentFolderKey,
-            destinationParentHashKey.Span,
+            destinationFolderKey,
+            destinationFolderHashKey.Span,
             nameSessionKey,
             signingKey,
             out var encryptedName,
             out var nameHashDigest);
 
-        var keyPassphraseKeyPacket = destinationParentFolderKey.EncryptSessionKey(passphraseSessionKey);
+        var keyPassphraseKeyPacket = destinationFolderKey.EncryptSessionKey(passphraseSessionKey);
 
         var parameters = new MoveLinkParameters
         {
-            ShareId = destinationShare.Id.Value,
-            ParentLinkId = destinationParentFolder.Id.Value,
+            ShareId = destinationShare.ShareId.Value,
+            ParentLinkId = destinationFolderIdentity.NodeId.Value,
             KeyPassphrase = keyPassphraseKeyPacket,
             Name = encryptedName,
             NameHashDigest = nameHashDigest,
             NameSignatureEmailAddress = destinationShare.MembershipEmailAddress,
-            OriginalNameHashDigest = node.NameHashDigest,
+            OriginalNameHashDigest = node.NameHashDigest.Memory,
         };
 
-        await client.LinksApi.MoveLinkAsync(shareId, node.Id, parameters, cancellationToken).ConfigureAwait(false);
+        await client.LinksApi.MoveLinkAsync(shareId, node.NodeIdentity.NodeId, parameters, cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task RenameAsync(
         ProtonDriveClient client,
         IShareForCommand share,
-        INodeForRename node,
-        LinkId parentFolderId,
+        INode node,
         string newName,
         string newMediaType,
         CancellationToken cancellationToken)
     {
-        using var signingKey = await client.Account.GetAddressPrimaryKeyAsync(share.MembershipAddressId, cancellationToken).ConfigureAwait(false);
-        using var nameSessionKey = await GetNameSessionKeyAsync(client, share.Id, node.VolumeId, node.Id, cancellationToken).ConfigureAwait(false);
-        using var parentFolderKey = await GetKeyAsync(client, share.Id, node.VolumeId, parentFolderId, cancellationToken).ConfigureAwait(false);
-        var parentFolderHashKey = await GetHashKeyAsync(client, share.Id, node.VolumeId, parentFolderId, cancellationToken).ConfigureAwait(false);
+        var nodeIdentity = new NodeIdentity { ShareId = share.ShareId, VolumeId = node.NodeIdentity.VolumeId, NodeId = node.NodeIdentity.NodeId };
+
+        // FIXME: Can ParentId be null? What then
+        var parentNodeIdentity = new NodeIdentity { ShareId = share.ShareId, VolumeId = node.NodeIdentity.VolumeId, NodeId = node.ParentId! };
+
+        using var signingKey = await client.Account.GetAddressPrimaryKeyAsync(new AddressId(share.MembershipAddressId), cancellationToken).ConfigureAwait(false);
+        using var nameSessionKey = await GetNameSessionKeyAsync(client, nodeIdentity, cancellationToken).ConfigureAwait(false);
+        using var parentFolderKey = await GetKeyAsync(client, parentNodeIdentity, cancellationToken).ConfigureAwait(false);
+        var parentFolderHashKey = await GetHashKeyAsync(client, parentNodeIdentity, cancellationToken).ConfigureAwait(false);
 
         GetNameParameters(newName, parentFolderKey, parentFolderHashKey.Span, nameSessionKey, signingKey, out var encryptedName, out var nameHashDigest);
 
@@ -137,48 +139,46 @@ public abstract class Node : INodeForMove
             NameHashDigest = nameHashDigest,
             NameSignatureEmailAddress = share.MembershipEmailAddress,
             MediaType = newMediaType,
-            OriginalNameHashDigest = node.NameHashDigest,
+            OriginalNameHashDigest = node.NameHashDigest.Memory,
         };
 
-        await client.LinksApi.RenameLinkAsync(share.Id, node.Id, parameters, cancellationToken).ConfigureAwait(false);
+        await client.LinksApi.RenameLinkAsync(share.ShareId, nodeIdentity.NodeId, parameters, cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task<PgpPrivateKey> GetKeyAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        VolumeId volumeId,
-        LinkId id,
+        INodeIdentity nodeIdentity,
         CancellationToken cancellationToken)
     {
-        if (!client.SecretsCache.TryUse(GetNodeKeyCacheKey(volumeId, id), (data, _) => PgpPrivateKey.Import(data), out var key))
+        if (!client.SecretsCache.TryUse(GetNodeKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => PgpPrivateKey.Import(data), out var key))
         {
-            await GetAsync(client, shareId, id, cancellationToken).ConfigureAwait(false);
+            await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
-            if (!client.SecretsCache.TryUse(GetNodeKeyCacheKey(volumeId, id), (data, _) => PgpPrivateKey.Import(data), out key))
+            if (!client.SecretsCache.TryUse(GetNodeKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => PgpPrivateKey.Import(data), out key))
             {
-                throw new ProtonApiException($"Could not get node key for {id}");
+                throw new ProtonApiException($"Could not get node key for {nodeIdentity.NodeId}");
             }
         }
 
         return key;
     }
 
-    private protected static CacheKey GetNodeKeyCacheKey(VolumeId volumeId, LinkId nodeId)
+    internal static CacheKey GetNodeKeyCacheKey(VolumeId volumeId, LinkId nodeId)
         => new(CacheContextName, volumeId.Value, CacheValueHolderName, nodeId.Value, CacheNodeKeyValueName);
 
-    private protected static CacheKey GetNameSessionKeyCacheKey(VolumeId volumeId, LinkId nodeId)
+    internal static CacheKey GetNameSessionKeyCacheKey(VolumeId volumeId, LinkId nodeId)
         => new(CacheContextName, volumeId.Value, CacheValueHolderName, nodeId.Value, CacheNameSessionKeyValueName);
 
-    private protected static CacheKey GetPassphraseSessionKeyCacheKey(VolumeId volumeId, LinkId nodeId)
+    internal static CacheKey GetPassphraseSessionKeyCacheKey(VolumeId volumeId, LinkId nodeId)
         => new(CacheContextName, volumeId.Value, CacheValueHolderName, nodeId.Value, CachePassphraseSessionKeyValueName);
 
-    private protected static CacheKey GetHashKeyCacheKey(VolumeId volumeId, LinkId nodeId)
+    internal static CacheKey GetHashKeyCacheKey(VolumeId volumeId, LinkId nodeId)
         => new(CacheContextName, volumeId.Value, CacheValueHolderName, nodeId.Value, CacheHashKeyValueName);
 
-    private protected static CacheKey GetContentKeyCacheKey(VolumeId volumeId, LinkId nodeId)
+    internal static CacheKey GetContentKeyCacheKey(VolumeId volumeId, LinkId nodeId)
         => new(CacheContextName, volumeId.Value, CacheValueHolderName, nodeId.Value, CacheContentKeyValueName);
 
-    private protected static void GetCommonCreationParameters(
+    internal static void GetCommonCreationParameters(
         string name,
         PgpPrivateKey parentFolderKey,
         ReadOnlySpan<byte> parentFolderHashKey,
@@ -212,27 +212,27 @@ public abstract class Node : INodeForMove
         GetNameParameters(name, parentFolderKey, parentFolderHashKey, nameSessionKey, signingKey, out encryptedName, out nameHashDigest);
     }
 
-    private protected static Node Decrypt(ProtonDriveClient client, Link link, PgpPrivateKey parentKey)
+    internal static INode Decrypt(ProtonDriveClient client, Link link, PgpPrivateKey parentKey)
     {
         var secretsCache = client.SecretsCache;
 
         var volumeId = new VolumeId(link.VolumeId);
-        var id = new LinkId(link.Id);
+        var linkId = new LinkId(link.Id);
         var parentId = link.ParentId is not null ? new LinkId(link.ParentId) : default(LinkId?);
         var state = (NodeState)link.State;
 
         using var nameSessionKey = parentKey.DecryptSessionKey(link.Name);
-        secretsCache.Set(GetNameSessionKeyCacheKey(volumeId, id), nameSessionKey.Export().Token);
+        secretsCache.Set(GetNameSessionKeyCacheKey(volumeId, linkId), nameSessionKey.Export().Token);
 
         var name = nameSessionKey.DecryptText(link.Name);
 
         using var passphraseSessionKey = parentKey.DecryptSessionKey(link.Passphrase);
-        secretsCache.Set(GetPassphraseSessionKeyCacheKey(volumeId, id), passphraseSessionKey.Export().Token);
+        secretsCache.Set(GetPassphraseSessionKeyCacheKey(volumeId, linkId), passphraseSessionKey.Export().Token);
 
         var passphrase = passphraseSessionKey.Decrypt(link.Passphrase);
 
         using var key = PgpPrivateKey.ImportAndUnlock(link.Key, passphrase);
-        secretsCache.Set(GetNodeKeyCacheKey(volumeId, id), key.ToBytes());
+        secretsCache.Set(GetNodeKeyCacheKey(volumeId, linkId), key.ToBytes());
 
         if (link.Type == LinkType.Folder)
         {
@@ -241,41 +241,58 @@ public abstract class Node : INodeForMove
             var hashKeyMessage = folderProperties.HashKey;
 
             var hashKey = key.Decrypt(hashKeyMessage);
-            secretsCache.Set(GetHashKeyCacheKey(volumeId, id), hashKey);
+            secretsCache.Set(GetHashKeyCacheKey(volumeId, linkId), hashKey);
 
-            return new FolderNode(volumeId, id, parentId, name, link.NameHashDigest, state);
+            return new FolderNode
+            {
+                NodeIdentity = new NodeIdentity
+                {
+                    VolumeId = volumeId,
+                    NodeId = linkId,
+                },
+                ParentId = parentId,
+                Name = name,
+                NameHashDigest = ByteString.CopyFrom(link.NameHashDigest.ToArray()),
+                State = state
+            };
         }
 
         var fileProperties = link.FileProperties ?? throw new ProtonApiException("Missing file properties on link of type File.");
 
         using var contentKey = key.DecryptSessionKey(fileProperties.ContentKeyPacket.Span);
-        secretsCache.Set(GetContentKeyCacheKey(volumeId, id), contentKey.Export().Token);
+        secretsCache.Set(GetContentKeyCacheKey(volumeId, linkId), contentKey.Export().Token);
 
         var extendedAttributes = link.ExtendedAttributes is not null
-            ? JsonSerializer.Deserialize(key.Decrypt(link.ExtendedAttributes.Value), ProtonDriveApiSerializerContext.Default.ExtendedAttributes)
-            : default;
+            ?
+            JsonSerializer.Deserialize(key.Decrypt(link.ExtendedAttributes.Value), ProtonDriveApiSerializerContext.Default.ExtendedAttributes)
+            :
+            default;
 
-        var activeRevision = fileProperties.ActiveRevision is not null
+        var activeRevisionDto = fileProperties.ActiveRevision is not null
             ? (fileProperties.ActiveRevision, extendedAttributes)
             : default((RevisionDto, ExtendedAttributes)?);
 
-        return new FileNode(volumeId, id, parentId, name, link.NameHashDigest, state, activeRevision);
+        return new FileNode(
+            new NodeIdentity { NodeId = linkId, VolumeId = volumeId },
+            parentId,
+            name,
+            ByteString.CopyFrom(link.NameHashDigest.ToArray()),
+            state,
+            activeRevisionDto);
     }
 
-    private protected static async Task<ReadOnlyMemory<byte>> GetHashKeyAsync(
+    internal static async Task<ReadOnlyMemory<byte>> GetHashKeyAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        VolumeId volumeId,
-        LinkId id,
+        INodeIdentity nodeIdentity,
         CancellationToken cancellationToken)
     {
-        if (!client.SecretsCache.TryUse(GetHashKeyCacheKey(volumeId, id), (data, _) => data.ToArray().AsMemory(), out var hashKey))
+        if (!client.SecretsCache.TryUse(GetHashKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => data.ToArray().AsMemory(), out var hashKey))
         {
-            await GetAsync(client, shareId, id, cancellationToken).ConfigureAwait(false);
+            await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
-            if (!client.SecretsCache.TryUse(GetHashKeyCacheKey(volumeId, id), (data, _) => data.ToArray().AsMemory(), out hashKey))
+            if (!client.SecretsCache.TryUse(GetHashKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => data.ToArray().AsMemory(), out hashKey))
             {
-                throw new ProtonApiException($"Could not get hash key for {id}");
+                throw new ProtonApiException($"Could not get hash key for {nodeIdentity.NodeId}");
             }
         }
 
@@ -324,7 +341,7 @@ public abstract class Node : INodeForMove
 
             while (currentId is not null)
             {
-                var response = await client.LinksApi.GetLinkAsync(shareId, currentId.Value, cancellationToken).ConfigureAwait(false);
+                var response = await client.LinksApi.GetLinkAsync(shareId, currentId, cancellationToken).ConfigureAwait(false);
 
                 if (client.SecretsCache.TryUse(
                     GetNodeKeyCacheKey(volumeId, new LinkId(response.Link.Id)),
@@ -361,24 +378,22 @@ public abstract class Node : INodeForMove
 
     private static async Task<PgpSessionKey> GetNameSessionKeyAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        VolumeId volumeId,
-        LinkId id,
+        NodeIdentity nodeIdentity,
         CancellationToken cancellationToken)
     {
         if (!client.SecretsCache.TryUse(
-            GetNameSessionKeyCacheKey(volumeId, id),
+            GetNameSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
             (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
             out var nameKey))
         {
-            await GetAsync(client, shareId, id, cancellationToken).ConfigureAwait(false);
+            await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
             if (!client.SecretsCache.TryUse(
-                GetNameSessionKeyCacheKey(volumeId, id),
+                GetNameSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
                 (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
                 out nameKey))
             {
-                throw new ProtonApiException($"Could not get name session key for {id}");
+                throw new ProtonApiException($"Could not get name session key for {nodeIdentity.NodeId}");
             }
         }
 
@@ -387,24 +402,22 @@ public abstract class Node : INodeForMove
 
     private static async Task<PgpSessionKey> GetPassphraseSessionKeyAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        VolumeId volumeId,
-        LinkId id,
+        NodeIdentity nodeIdentity,
         CancellationToken cancellationToken)
     {
         if (!client.SecretsCache.TryUse(
-            GetPassphraseSessionKeyCacheKey(volumeId, id),
+            GetPassphraseSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
             (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
             out var passphraseKey))
         {
-            await GetAsync(client, shareId, id, cancellationToken).ConfigureAwait(false);
+            await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
             if (!client.SecretsCache.TryUse(
-                GetPassphraseSessionKeyCacheKey(volumeId, id),
+                GetPassphraseSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
                 (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
                 out passphraseKey))
             {
-                throw new ProtonApiException($"Could not get passphrase session key for {id}");
+                throw new ProtonApiException($"Could not get passphrase session key for {nodeIdentity.NodeId}");
             }
         }
 

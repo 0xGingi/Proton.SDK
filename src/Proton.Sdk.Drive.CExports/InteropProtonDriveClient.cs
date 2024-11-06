@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Proton.Sdk.CExports;
@@ -17,7 +17,7 @@ internal static class InteropProtonDriveClient
     }
 
     [UnmanagedCallersOnly(EntryPoint = "drive_client_create", CallConvs = [typeof(CallConvCdecl)])]
-    private static unsafe int Create(nint sessionHandle, nint* clientHandle)
+    private static unsafe int NativeCreate(nint sessionHandle, nint* clientHandle)
     {
         try
         {
@@ -39,7 +39,7 @@ internal static class InteropProtonDriveClient
     }
 
     [UnmanagedCallersOnly(EntryPoint = "drive_client_free", CallConvs = [typeof(CallConvCdecl)])]
-    private static void Free(nint handle)
+    private static void NativeFree(nint handle)
     {
         try
         {

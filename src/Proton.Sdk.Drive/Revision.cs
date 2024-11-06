@@ -1,17 +1,18 @@
-﻿using Proton.Sdk.Drive.Files;
+using Google.Protobuf;
+using Google.Protobuf.Collections;
+using Proton.Sdk.Drive.Files;
 
 namespace Proton.Sdk.Drive;
 
-public sealed class Revision : IRevisionForTransfer
+public sealed partial class Revision : IRevisionForTransfer
 {
     internal Revision(VolumeId volumeId, LinkId fileId, RevisionDto properties, ExtendedAttributes extendedAttributes)
         : this(volumeId, fileId, new RevisionId(properties.Id), properties.State, properties.Size, extendedAttributes, GetSamplesSha256Digests(properties))
     {
-        ManifestSignature = properties.ManifestSignature;
+        ManifestSignature = ByteStringExtensions.FromMemory(properties.ManifestSignature);
         SignatureEmailAddress = properties.SignatureEmailAddress;
-        CreationTime = properties.CreationTime;
-
-        SamplesSha256Digests = GetSamplesSha256Digests(properties);
+        CreationTime = (long)(properties.CreationTime - new DateTime(1970, 1, 1)).TotalSeconds;
+        SamplesSha256Digests.Add(GetSamplesSha256Digests(properties));
     }
 
     internal Revision(VolumeId volumeId, LinkId fileId, RevisionId id, RevisionState state, long size, in ExtendedAttributes extendedAttributes)
@@ -26,47 +27,47 @@ public sealed class Revision : IRevisionForTransfer
         RevisionState state,
         long size,
         in ExtendedAttributes extendedAttributes,
-        IReadOnlyList<ReadOnlyMemory<byte>> previewImageSha256Digests)
+        RepeatedField<ByteString> previewImageSha256Digests)
     {
         VolumeId = volumeId;
         FileId = fileId;
-        Id = id;
+        RevisionId = id;
         State = state;
-        Size = extendedAttributes.Common?.Size;
+        Size = extendedAttributes.Common?.Size ?? 0;
         QuotaConsumption = size;
-        SamplesSha256Digests = previewImageSha256Digests;
+        SamplesSha256Digests.Add(previewImageSha256Digests);
     }
 
-    public VolumeId VolumeId { get; }
-    public LinkId FileId { get; }
-    public RevisionId Id { get; }
-    public RevisionState State { get; }
-    public long? Size { get; }
-    public long QuotaConsumption { get; }
-    public DateTime CreationTime { get; }
-
-    public ReadOnlyMemory<byte>? ManifestSignature { get; }
-    public string? SignatureEmailAddress { get; }
-    public IReadOnlyList<ReadOnlyMemory<byte>> SamplesSha256Digests { get; }
+    public RevisionMetadata Metadata()
+    {
+        var revisionMetadata = new RevisionMetadata
+        {
+            RevisionId = RevisionId,
+            State = State,
+            ManifestSignature = ManifestSignature,
+            SignatureEmailAddress = SignatureEmailAddress,
+        };
+        revisionMetadata.SamplesSha256Digests.Add(SamplesSha256Digests);
+        return revisionMetadata;
+    }
 
     internal static async Task<RevisionReader> OpenForReadingAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        INodeIdentity file,
-        IRevisionForTransfer revision,
+        INodeIdentity fileIdentity,
+        IRevisionForTransfer revisionMetadata,
         CancellationToken cancellationToken)
     {
-        if (revision.State is RevisionState.Draft)
+        if (revisionMetadata.State is RevisionState.Draft)
         {
             throw new InvalidOperationException("Draft revision cannot be opened for reading");
         }
 
-        var contentKey = await FileNode.GetContentKeyAsync(client, shareId, file.VolumeId, file.Id, cancellationToken).ConfigureAwait(false);
+        var contentKey = await FileNode.GetFileContentKeyAsync(client, fileIdentity, cancellationToken).ConfigureAwait(false);
 
         var revisionResponse = await client.FilesApi.GetRevisionAsync(
-            shareId,
-            file.Id,
-            revision.Id,
+            fileIdentity.ShareId,
+            fileIdentity.NodeId,
+            revisionMetadata.RevisionId,
             RevisionReader.MinBlockIndex,
             RevisionReader.BlockPageSize,
             false,
@@ -74,37 +75,47 @@ public sealed class Revision : IRevisionForTransfer
 
         await client.BlockDownloader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        return new RevisionReader(client, shareId, file, revision, contentKey, revisionResponse);
+        return new RevisionReader(client, fileIdentity, revisionMetadata, contentKey, revisionResponse);
     }
 
     internal static async Task<RevisionWriter> OpenForWritingAsync(
         ProtonDriveClient client,
-        IShareForCommand share,
-        INodeIdentity file,
-        IRevisionForTransfer revision,
+        FileWriteRequest fileWriteRequest,
+        Action<long> onProgress,
         CancellationToken cancellationToken)
     {
-        if (revision.State is not RevisionState.Draft)
+        if (fileWriteRequest.RevisionMetadata.State is not RevisionState.Draft)
         {
             throw new InvalidOperationException("Non-draft revision cannot be opened for writing");
         }
 
-        var fileKey = await Node.GetKeyAsync(client, share.Id, file.VolumeId, file.Id, cancellationToken).ConfigureAwait(false);
-        var contentKey = await FileNode.GetContentKeyAsync(client, share.Id, file.VolumeId, file.Id, cancellationToken).ConfigureAwait(false);
-        var signingKey = await client.Account.GetAddressPrimaryKeyAsync(share.MembershipAddressId, cancellationToken).ConfigureAwait(false);
+        var fileKey = await Node.GetKeyAsync(client, fileWriteRequest.NodeIdentity, cancellationToken).ConfigureAwait(false);
+        var contentKey = await FileNode.GetFileContentKeyAsync(client, fileWriteRequest.NodeIdentity, cancellationToken).ConfigureAwait(false);
+        var signingKey = await client.Account.GetAddressPrimaryKeyAsync(fileWriteRequest.ShareMetadata.MembershipAddressId, cancellationToken).ConfigureAwait(false);
 
         await client.BlockUploader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         const int targetBlockSize = RevisionWriter.DefaultBlockSize;
-        return new RevisionWriter(client, share, file.Id, revision.Id, fileKey, contentKey, signingKey, targetBlockSize, targetBlockSize * 3 / 2);
+        var writer = new RevisionWriter(
+            client,
+            fileWriteRequest.ShareMetadata,
+            fileWriteRequest.NodeIdentity.NodeId,
+            fileWriteRequest.RevisionMetadata.RevisionId,
+            fileKey,
+            contentKey,
+            signingKey,
+            targetBlockSize,
+            targetBlockSize * 3 / 2);
+        writer.ProgressUpdated += onProgress;
+        return writer;
     }
 
-    internal static async Task DeleteAsync(FilesApiClient filesApi, ShareId shareId, LinkId fileId, RevisionId revisionId, CancellationToken cancellationToken)
+    internal static async Task DeleteAsync(FilesApiClient filesApi, ShareBasedRevisionIdentity shareBasedRevisionIdentity, CancellationToken cancellationToken)
     {
-        await filesApi.DeleteRevisionAsync(shareId, fileId, revisionId, cancellationToken).ConfigureAwait(false);
+        await filesApi.DeleteRevisionAsync(shareBasedRevisionIdentity.ShareId, shareBasedRevisionIdentity.NodeId, shareBasedRevisionIdentity.RevisionId, cancellationToken).ConfigureAwait(false);
     }
 
-    private static ReadOnlyMemory<byte>[] GetSamplesSha256Digests(RevisionDto properties)
+    private static RepeatedField<ByteString> GetSamplesSha256Digests(RevisionDto properties)
     {
         if (properties.Thumbnails is null)
         {
@@ -112,16 +123,16 @@ public sealed class Revision : IRevisionForTransfer
         }
 
         Span<ThumbnailType> keys = stackalloc ThumbnailType[properties.Thumbnails.Count];
-        var digests = new ReadOnlyMemory<byte>[properties.Thumbnails.Count];
+        var digests = new RepeatedField<ByteString>();
 
         for (var i = 0; i < properties.Thumbnails.Count; ++i)
         {
             var thumbnail = properties.Thumbnails[i];
             keys[i] = thumbnail.Type;
-            digests[i] = thumbnail.HashDigest;
+            digests.Add(ByteStringExtensions.FromMemory(thumbnail.HashDigest));
         }
 
-        keys.Sort(digests.AsSpan());
+        keys.Sort(digests.ToArray().AsSpan());
 
         return digests;
     }

@@ -13,7 +13,7 @@ internal sealed class AuthorizationHandler(ProtonApiSession session) : Delegatin
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        request.Headers.Add(SessionIdHeaderName, _session.Id);
+        request.Headers.Add(SessionIdHeaderName, _session.SessionId.Value);
 
         var accessToken = await _session.TokenCredential.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
 

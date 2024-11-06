@@ -7,7 +7,7 @@ namespace Proton.Sdk.Drive.CExports;
 
 internal static class InteropRevisionReader
 {
-    internal static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out RevisionReader reader)
+    private static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out RevisionReader reader)
     {
         var gcHandle = GCHandle.FromIntPtr(handle);
 
@@ -17,7 +17,7 @@ internal static class InteropRevisionReader
     }
 
     [UnmanagedCallersOnly(EntryPoint = "revision_reader_read", CallConvs = [typeof(CallConvCdecl)])]
-    private static int Read(nint readerHandle, InteropExternalWriter externalWriter, InteropAsyncCallback<byte> callback)
+    private static int NativeRead(nint readerHandle, InteropExternalWriter externalWriter, InteropAsyncCallback callback)
     {
         try
         {
@@ -26,7 +26,7 @@ internal static class InteropRevisionReader
                 return -1;
             }
 
-            callback.InvokeFor(ct => ReadAsync(reader, externalWriter.ToStream(), ct));
+            callback.InvokeFor(ct => InteropReadAsync(reader, externalWriter.ToStream(), ct));
 
             return 0;
         }
@@ -37,7 +37,7 @@ internal static class InteropRevisionReader
     }
 
     [UnmanagedCallersOnly(EntryPoint = "revision_reader_read_to_path", CallConvs = [typeof(CallConvCdecl)])]
-    private static int Read(nint readerHandle, InteropArray targetFilePath, InteropAsyncCallback<byte> callback)
+    private static int NativeRead(nint readerHandle, InteropArray revisionReadRequestBytes, InteropAsyncCallback callback)
     {
         try
         {
@@ -46,7 +46,7 @@ internal static class InteropRevisionReader
                 return -1;
             }
 
-            callback.InvokeFor(ct => ReadAsync(reader, targetFilePath.Utf8ToString(), ct));
+            callback.InvokeFor(ct => InteropReadAsync(reader, revisionReadRequestBytes, ct));
 
             return 0;
         }
@@ -57,7 +57,7 @@ internal static class InteropRevisionReader
     }
 
     [UnmanagedCallersOnly(EntryPoint = "revision_reader_free", CallConvs = [typeof(CallConvCdecl)])]
-    private static void Free(nint handle)
+    private static void NativeFree(nint handle)
     {
         try
         {
@@ -83,31 +83,33 @@ internal static class InteropRevisionReader
         }
     }
 
-    private static async ValueTask<Result<byte, SdkError>> ReadAsync(RevisionReader reader, Stream outputStream, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropReadAsync(RevisionReader reader, Stream outputStream, CancellationToken cancellationToken)
     {
         try
         {
             var verificationStatus = await reader.ReadAsync(outputStream, cancellationToken).ConfigureAwait(false);
 
-            return (byte)verificationStatus;
+            return ResultExtensions.Success(new VerificationStatusResponse { VerificationStatus = verificationStatus });
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            return SdkError.FromException(ex);
+            return ResultExtensions.Failure(-5, e.Message);
         }
     }
 
-    private static async ValueTask<Result<byte, SdkError>> ReadAsync(RevisionReader reader, string targetFilePath, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropReadAsync(RevisionReader reader, InteropArray revisionReadRequestBytes, CancellationToken cancellationToken)
     {
         try
         {
-            var verificationStatus = await reader.ReadAsync(targetFilePath, cancellationToken).ConfigureAwait(false);
+            var revisionReadRequest = RevisionWriteRequest.Parser.ParseFrom(revisionReadRequestBytes.ToArray());
 
-            return (byte)verificationStatus;
+            var verificationStatus = await reader.ReadAsync(revisionReadRequest.TargetFilePath, cancellationToken).ConfigureAwait(false);
+
+            return ResultExtensions.Success(new VerificationStatusResponse { VerificationStatus = verificationStatus });
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            return SdkError.FromException(ex);
+            return ResultExtensions.Failure(-5, e.Message);
         }
     }
 }

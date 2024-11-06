@@ -23,7 +23,7 @@ internal sealed class BlockUploader
     public SemaphoreSlim BlockSemaphore { get; }
 
     public async Task<byte[]> UploadAsync(
-        IShareForCommand share,
+        ShareMetadata shareMetadata,
         LinkId fileId,
         RevisionId revisionId,
         int index,
@@ -34,6 +34,7 @@ internal sealed class BlockUploader
         BlockVerifier verifier,
         byte[] plainDataPrefix,
         int plainDataPrefixLength,
+        Action<long> onProgress,
         CancellationToken cancellationToken)
     {
         try
@@ -80,8 +81,8 @@ internal sealed class BlockUploader
 
                     var parameters = new BlockUploadRequestParameters
                     {
-                        AddressId = share.MembershipAddressId.Value,
-                        ShareId = share.Id.Value,
+                        AddressId = shareMetadata.MembershipAddressId.Value,
+                        ShareId = shareMetadata.ShareId.Value,
                         LinkId = fileId.Value,
                         RevisionId = revisionId.Value,
                         Blocks =
@@ -106,6 +107,8 @@ internal sealed class BlockUploader
                     dataPacketStream.Seek(0, SeekOrigin.Begin);
 
                     await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
+
+                    onProgress?.Invoke(dataPacketStream.Length);
 
                     return sha256Digest;
                 }
@@ -155,7 +158,7 @@ internal sealed class BlockUploader
                 var parameters = new BlockUploadRequestParameters
                 {
                     AddressId = share.MembershipAddressId.Value,
-                    ShareId = share.Id.Value,
+                    ShareId = share.ShareId.Value,
                     LinkId = fileId.Value,
                     RevisionId = revisionId.Value,
                     Blocks = [],

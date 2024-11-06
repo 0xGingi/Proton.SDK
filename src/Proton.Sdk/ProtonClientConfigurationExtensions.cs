@@ -12,7 +12,7 @@ internal static class ProtonClientConfigurationExtensions
 
     public static HttpClient GetHttpClient(this ProtonClientConfiguration config, ProtonApiSession? session = null, string? baseRoutePath = default)
     {
-        var baseAddress = baseRoutePath is not null ? new Uri(config.BaseUrl, baseRoutePath) : config.BaseUrl;
+        var baseAddress = config.BaseUrl + (baseRoutePath ?? string.Empty);
 
         var services = new ServiceCollection();
 
@@ -54,7 +54,7 @@ internal static class ProtonClientConfigurationExtensions
 
                 builder.ConfigureHttpClient(httpClient =>
                 {
-                    httpClient.BaseAddress = baseAddress;
+                    httpClient.BaseAddress = new Uri(baseAddress);
                     httpClient.DefaultRequestHeaders.Add("x-pm-appversion", config.AppVersion);
                     httpClient.DefaultRequestHeaders.Add("User-Agent", config.UserAgent);
                 });

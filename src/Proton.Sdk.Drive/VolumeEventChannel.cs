@@ -4,8 +4,8 @@ namespace Proton.Sdk.Drive;
 
 public sealed class VolumeEventChannel(ProtonDriveClient client, VolumeId volumeId) : EventChannelBase<VolumeEventId>
 {
-    public event Action<Node>? NodeCreated;
-    public event Action<Node>? NodeMetadataChanged;
+    public event Action<INode>? NodeCreated;
+    public event Action<INode>? NodeMetadataChanged;
     public event Action<FileNode>? FileContentsChanged;
     public event Action<VolumeId, LinkId>? NodeDeleted;
 
@@ -42,7 +42,7 @@ public sealed class VolumeEventChannel(ProtonDriveClient client, VolumeId volume
         }
     }
 
-    private async ValueTask DispatchNodeEventAsync(LinkEventDto dto, Action<Node>? handlers, CancellationToken cancellationToken)
+    private async ValueTask DispatchNodeEventAsync(LinkEventDto dto, Action<INode>? handlers, CancellationToken cancellationToken)
     {
         if (handlers == null)
         {

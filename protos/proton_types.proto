@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+option csharp_namespace = "Proton.Sdk";
+
+// Mark: - Users
+
+message UserKey {
+    UserKeyId key_id = 1;
+    bytes key_data = 2;
+}
+
+message ArmoredUserKey {
+    UserKeyId key_id = 1;
+    bytes armored_key_data = 2;
+    string passphrase = 3;
+}
+
+enum AddressStatus {
+    ADDRESS_STATUS_DISABLED = 0;
+    ADDRESS_STATUS_ENABLED = 1;
+    ADDRESS_STATUS_DELETING = 2;
+}
+
+enum AddressKeyFlags {
+    ADDRESS_KEY_FLAGS_NONE = 0;
+    ADDRESS_KEY_FLAGS_IS_ALLOWED_FOR_SIGNATURE_VERIFICATION = 1;
+    ADDRESS_KEY_FLAGS_IS_ALLOWED_FOR_ENCRYPTION = 2;
+}
+
+enum PasswordMode {
+    PASSWORD_MODE_UNKNOWN_PASSWORD_MODE = 0;
+    PASSWORD_MODE_SINGLE = 1;
+    PASSWORD_MODE_DUAL = 2;
+}
+
+enum DelinquentState {
+    DELINQUENT_STATE_PAID = 0;
+    DELINQUENT_STATE_AVAILABLE = 1;
+    DELINQUENT_STATE_OVERDUE = 2;
+    DELINQUENT_STATE_DELINQUENT = 3;
+    DELINQUENT_STATE_NOT_RECEIVED = 4;
+}
+
+enum UserType {
+    USER_TYPE_UNKNOWN = 0;
+    USER_TYPE_PROTON = 1;
+    USER_TYPE_MANAGED = 2;
+    USER_TYPE_EXTERNAL = 3;
+}
+
+// Mark: - Sessions
+
+message ProtonClientOptions {
+    string app_version = 1;
+    string user_agent = 2;
+    string base_url = 3;
+    optional bool disable_tls_pinning = 4;
+    optional bool ignore_ssl_certificate_errors = 5;
+    int64 logger_provider_handle = 6;
+}
+
+message SessionBeginRequest {
+    string username = 1;
+    string password = 2;
+    string base_url = 3;
+    optional ProtonClientOptions options = 4;
+}
+
+message SessionResumeRequest {
+    SessionId session_id = 1;
+    string username = 2;
+    UserId user_id = 3;
+    string access_token = 4;
+    string refresh_token = 5;
+    repeated string scopes = 6;
+    bool is_waiting_for_second_factor_code = 7;
+    PasswordMode password_mode = 8;
+    ProtonClientOptions options = 9;
+}
+
+message SessionRenewRequest {
+    SessionId session_id = 2;
+    string access_token = 3;
+    string refresh_token = 4;
+    repeated string scopes = 5;
+    bool is_waiting_for_second_factor_code = 6;
+    PasswordMode password_mode = 7;
+}
+
+message SessionEndRequest {
+    int64 session_handle = 1;
+}
+
+// Events
+
+message LogEvent {
+    int32 level = 1;
+    string message = 2;
+    string category_name = 3;
+}
+
+
+message ProgressUpdate {
+    int64 bytes_completed = 1;
+    int64 bytes_in_total = 2;
+}
+
+// Mark: - Responses
+
+message ErrorResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message StringResponse {
+    string value = 1;
+}
+
+message IntResponse {
+    int64 value = 1;
+}
+
+// Identifiers
+
+message SessionId {
+    string value = 1;
+}
+
+message UserId {
+    string value = 1;
+}
+
+message UserKeyId {
+    string value = 1;
+}
+
+message AddressId {
+    string value = 1;
+}
+
+message AddressKeyId {
+    string value = 1;
+}
+
+message AddressKey {
+    AddressId address_id = 1;
+    AddressKeyId addressKey_id = 2;
+    bool is_allowed_for_encryption = 3;
+}

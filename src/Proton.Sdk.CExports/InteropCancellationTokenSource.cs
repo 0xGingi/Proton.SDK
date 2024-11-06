@@ -34,13 +34,13 @@ internal static class InteropCancellationTokenSource
     }
 
     [UnmanagedCallersOnly(EntryPoint = "cancellation_token_source_create", CallConvs = [typeof(CallConvCdecl)])]
-    private static nint Create()
+    private static nint NativeCreate()
     {
         return GCHandle.ToIntPtr(GCHandle.Alloc(new CancellationTokenSource()));
     }
 
     [UnmanagedCallersOnly(EntryPoint = "cancellation_token_source_cancel", CallConvs = [typeof(CallConvCdecl)])]
-    private static void Cancel(nint cancellationTokenSourceHandle)
+    private static void NativeCancel(nint cancellationTokenSourceHandle)
     {
         try
         {
@@ -58,7 +58,7 @@ internal static class InteropCancellationTokenSource
     }
 
     [UnmanagedCallersOnly(EntryPoint = "cancellation_token_source_free", CallConvs = [typeof(CallConvCdecl)])]
-    private static void Free(nint cancellationTokenSourceHandle)
+    private static void NativeFree(nint cancellationTokenSourceHandle)
     {
         try
         {

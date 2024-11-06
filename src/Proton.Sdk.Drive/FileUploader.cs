@@ -12,21 +12,38 @@ public sealed class FileUploader
     }
 
     public async Task<FileNode> UploadAsync(
-        IShareForCommand share,
-        INodeIdentity parentFolder,
+        ShareMetadata shareMetadata,
+        NodeIdentity parentFolderIdentity,
         string name,
         string mediaType,
         Stream contentInputStream,
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
+        Action<long> onProgress,
         CancellationToken cancellationToken)
     {
-        var (file, revision) = await FileNode.CreateAsync(_client, share, parentFolder, name, mediaType, cancellationToken).ConfigureAwait(false);
+        parentFolderIdentity = new NodeIdentity(shareMetadata.ShareId, parentFolderIdentity);
 
-        using var revisionWriter = await Revision.OpenForWritingAsync(_client, share, file, revision, cancellationToken).ConfigureAwait(false);
+        var fileCreationRequest = new FileCreationRequest
+        {
+            ParentFolderIdentity = parentFolderIdentity,
+            ShareMetadata = shareMetadata,
+            MimeType = mediaType,
+            Name = name,
+        };
+        var fileCreationResponse = await FileNode.CreateFileAsync(_client, fileCreationRequest, cancellationToken).ConfigureAwait(false);
+
+        var fileWriteRequest = new FileWriteRequest
+        {
+            NodeIdentity = parentFolderIdentity,
+            ShareMetadata = shareMetadata,
+            RevisionMetadata = fileCreationResponse.Revision.Metadata(),
+        };
+
+        using var revisionWriter = await Revision.OpenForWritingAsync(_client, fileWriteRequest, onProgress, cancellationToken).ConfigureAwait(false);
 
         await revisionWriter.WriteAsync(contentInputStream, samples, lastModificationTime, cancellationToken).ConfigureAwait(false);
 
-        return file;
+        return fileCreationResponse.File;
     }
 }

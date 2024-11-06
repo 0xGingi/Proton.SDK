@@ -1,8 +1,8 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using Proton.Cryptography.Pgp;
-using Proton.Sdk.Authentication;
 
 namespace Proton.Sdk.CExports;
 
@@ -18,15 +18,13 @@ internal static class InteropProtonApiSession
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_begin", CallConvs = [typeof(CallConvCdecl)])]
-    private static nint Begin(
-        InteropArray username,
-        InteropArray password,
-        InteropProtonClientOptions interopOptions,
-        InteropAsyncCallback<nint> callback)
+    private static int NativeBegin(
+        InteropArray sessionBeginRequestBytes,
+        InteropAsyncCallback callback)
     {
         try
         {
-            return callback.InvokeFor(ct => BeginAsync(username.Utf8ToString(), password.ToArray(), interopOptions.ToManaged(), ct));
+            return callback.InvokeFor(ct => InteropBeginAsync(sessionBeginRequestBytes, ct));
         }
         catch
         {
@@ -35,32 +33,15 @@ internal static class InteropProtonApiSession
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_resume", CallConvs = [typeof(CallConvCdecl)])]
-    private static unsafe int Resume(
-        InteropArray id,
-        InteropArray username,
-        InteropArray userId,
-        InteropArray accessToken,
-        InteropArray refreshToken,
-        InteropArray scopes,
-        bool isWaitingForSecondFactorCode,
-        byte passwordMode,
-        InteropProtonClientOptions options,
+    private static unsafe int NativeResume(
+        InteropArray sessionResumeRequestBytes,
         nint* sessionHandle)
     {
         try
         {
-            var idString = id.Utf8ToString();
-            var userIdString = userId.Utf8ToString();
-            var session = ProtonApiSession.Resume(
-                idString,
-                username.Utf8ToString(),
-                new UserId(userIdString),
-                accessToken.Utf8ToString(),
-                refreshToken.Utf8ToString(),
-                scopes.Utf8ToString().Replace("[", string.Empty).Replace("]", string.Empty).Split(","),
-                isWaitingForSecondFactorCode,
-                (PasswordMode)passwordMode,
-                options.ToManaged());
+            var sessionResumeRequest = SessionResumeRequest.Parser.ParseFrom(sessionResumeRequestBytes.AsReadOnlySpan());
+
+            var session = ProtonApiSession.Resume(sessionResumeRequest);
 
             *sessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
 
@@ -73,18 +54,15 @@ internal static class InteropProtonApiSession
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_renew", CallConvs = [typeof(CallConvCdecl)])]
-    private static unsafe int Renew(
+    private static unsafe int NativeRenew(
         nint oldSessionHandle,
-        InteropArray id,
-        InteropArray accessToken,
-        InteropArray refreshToken,
-        InteropArray scopes,
-        bool isWaitingForSecondFactorCode,
-        byte passwordMode,
+        InteropArray sessionRenewRequestBytes,
         nint* newSessionHandle)
     {
         try
         {
+            var sessionRenewRequest = SessionRenewRequest.Parser.ParseFrom(sessionRenewRequestBytes.AsReadOnlySpan());
+
             if (!TryGetFromHandle(oldSessionHandle, out var expiredSession))
             {
                 return -1;
@@ -92,12 +70,7 @@ internal static class InteropProtonApiSession
 
             var session = ProtonApiSession.Renew(
                 expiredSession,
-                id.Utf8ToString(),
-                accessToken.Utf8ToString(),
-                refreshToken.Utf8ToString(),
-                scopes.Utf8ToString().Replace("[", string.Empty).Replace("]", string.Empty).Split(","),
-                isWaitingForSecondFactorCode,
-                (PasswordMode)passwordMode);
+                sessionRenewRequest);
 
             *newSessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
 
@@ -110,35 +83,43 @@ internal static class InteropProtonApiSession
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_add_user_key", CallConvs = [typeof(CallConvCdecl)])]
-    private static int AddUserKey(nint sessionHandle, InteropArray keyId, InteropArray keyData)
+    private static int NativeAddUserKey(nint sessionHandle, InteropArray userKeyData)
     {
+        var userKey = UserKey.Parser.ParseFrom(userKeyData.AsReadOnlySpan());
+
         if (!TryGetFromHandle(sessionHandle, out var session))
         {
             return -1;
         }
 
-        session.AddUserKey(session.UserId, new UserKeyId(keyId.Utf8ToString()), keyData.AsReadOnlySpan());
+        session.AddUserKey(session.UserId, new UserKeyId(userKey.KeyId), userKey.KeyData.ToByteArray()); // AsReadOnlySpan
 
         return 0;
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_add_armored_locked_user_key", CallConvs = [typeof(CallConvCdecl)])]
-    private static int AddUserKey(nint sessionHandle, InteropArray keyId, InteropArray keyData, InteropArray passphrase)
+    private static int NativeAddArmoredUserKey(nint sessionHandle, InteropArray armoredUserKeyData)
     {
+        var armoredUserKey = ArmoredUserKey.Parser.ParseFrom(armoredUserKeyData.AsReadOnlySpan());
+
         if (!TryGetFromHandle(sessionHandle, out var session))
         {
             return -1;
         }
 
-        using var userKey = PgpPrivateKey.ImportAndUnlock(keyData.AsReadOnlySpan(), passphrase.AsReadOnlySpan(), PgpEncoding.AsciiArmor);
+        using var userKey = PgpPrivateKey.ImportAndUnlock(
+            armoredUserKey.ArmoredKeyData.ToByteArray(),
+            Encoding.UTF8.GetBytes(armoredUserKey.Passphrase),
+            PgpEncoding.AsciiArmor
+        );
 
-        session.AddUserKey(session.UserId, new UserKeyId(keyId.Utf8ToString()), userKey.ToBytes());
+        session.AddUserKey(session.UserId, new UserKeyId(armoredUserKey.KeyId), userKey.ToBytes());
 
         return 0;
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_end", CallConvs = [typeof(CallConvCdecl), typeof(CallConvMemberFunction)])]
-    private static int End(nint sessionHandle, InteropAsyncCallbackNoCancellation callback)
+    private static int NativeEnd(nint sessionHandle, InteropAsyncCallback callback)
     {
         try
         {
@@ -147,7 +128,7 @@ internal static class InteropProtonApiSession
                 return -1;
             }
 
-            callback.InvokeFor(() => EndAsync(session));
+            callback.InvokeFor(ct => InteropEndAsync(session));
 
             return 0;
         }
@@ -158,7 +139,7 @@ internal static class InteropProtonApiSession
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_free", CallConvs = [typeof(CallConvCdecl)])]
-    private static void Free(nint handle)
+    private static void NativeFree(nint handle)
     {
         try
         {
@@ -172,35 +153,36 @@ internal static class InteropProtonApiSession
         }
     }
 
-    private static async ValueTask<Result<nint, SdkError>> BeginAsync(
-        string username,
-        ReadOnlyMemory<byte> password,
-        ProtonClientOptions options,
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropBeginAsync(
+        InteropArray sessionBeginRequestBytes,
         CancellationToken cancellationToken)
     {
         try
         {
-            var session = await ProtonApiSession.BeginAsync(username, password, options, cancellationToken).ConfigureAwait(false);
+            var sessionBeginRequest = SessionBeginRequest.Parser.ParseFrom(sessionBeginRequestBytes.AsReadOnlySpan());
 
-            return GCHandle.ToIntPtr(GCHandle.Alloc(session));
+            var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken).ConfigureAwait(false);
+
+            nint handle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
+            return ResultExtensions.Success(new IntResponse { Value = handle });
         }
         catch (Exception e)
         {
-            return SdkError.FromException(e);
+            return ResultExtensions.Failure(-1, e.Message);
         }
     }
 
-    private static async ValueTask<Result<SdkError>> EndAsync(ProtonApiSession session)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropEndAsync(ProtonApiSession session)
     {
         try
         {
             await session.EndAsync().ConfigureAwait(false);
 
-            return true;
+            return ResultExtensions.Success();
         }
         catch (Exception e)
         {
-            return SdkError.FromException(e);
+            return ResultExtensions.Failure(-2, e.Message);
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using Google.Protobuf;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Folders;
@@ -7,24 +8,29 @@ using Proton.Sdk.Drive.Links;
 
 namespace Proton.Sdk.Drive;
 
-public sealed class FolderNode(
-    VolumeId volumeId,
-    LinkId id,
-    LinkId? parentId,
-    string name,
-    ReadOnlyMemory<byte> nameHashDigest,
-    NodeState state)
-    : Node(volumeId, id, parentId, name, nameHashDigest, state)
+public sealed partial class FolderNode : INode
 {
-    internal static async IAsyncEnumerable<Node> GetChildrenAsync(
+    internal FolderNode(
+        NodeIdentity nodeIdentity,
+        LinkId? parentId,
+        string name,
+        ByteString nameHashDigest,
+        NodeState state)
+    {
+        NodeIdentity = nodeIdentity;
+        ParentId = parentId;
+        Name = name;
+        NameHashDigest = nameHashDigest;
+        State = state;
+    }
+
+    internal static async IAsyncEnumerable<INode> GetFolderChildrenAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        VolumeId volumeId,
-        LinkId folderId,
+        INodeIdentity folderIdentity,
         bool includeHidden,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var folderKey = await GetKeyAsync(client, shareId, volumeId, folderId, cancellationToken).ConfigureAwait(false);
+        var folderKey = await Node.GetKeyAsync(client, folderIdentity, cancellationToken).ConfigureAwait(false);
 
         var parameters = new FolderChildListParameters { PageIndex = 0, PageSize = FoldersApiClient.FolderChildListingPageSize, ShowAll = includeHidden };
 
@@ -32,55 +38,55 @@ public sealed class FolderNode(
 
         do
         {
-            response = await client.FoldersApi.GetChildrenAsync(shareId, folderId, parameters, cancellationToken).ConfigureAwait(false);
+            response = await client.FoldersApi.GetChildrenAsync(folderIdentity.ShareId, folderIdentity.NodeId, parameters, cancellationToken).ConfigureAwait(false);
 
             foreach (var childLink in response.Links)
             {
-                yield return Decrypt(client, childLink, folderKey);
+                yield return Node.Decrypt(client, childLink, folderKey);
             }
 
             ++parameters.PageIndex;
         } while (response.Links.Count >= FoldersApiClient.FolderChildListingPageSize);
     }
 
-    internal static async Task TrashChildrenAsync(
+    internal static async Task TrashFolderChildrenAsync(
         FoldersApiClient client,
-        ShareId shareId,
-        INodeIdentity folder,
+        INodeIdentity folderIdentity,
         IEnumerable<LinkId> nodeIds,
         CancellationToken cancellationToken)
     {
         var parameters = new MultipleLinkActionParameters { LinkIds = nodeIds.Select(x => x.Value) };
 
-        await client.TrashChildrenAsync(shareId, folder.Id, parameters, cancellationToken).ConfigureAwait(false);
+        await client.TrashChildrenAsync(folderIdentity.ShareId, folderIdentity.NodeId, parameters, cancellationToken).ConfigureAwait(false);
     }
 
-    internal static async Task DeleteChildrenAsync(
+    internal static async Task DeleteFolderChildrenAsync(
         FoldersApiClient client,
-        ShareId shareId,
-        INodeIdentity folder,
+        INodeIdentity folderIdentity,
         IEnumerable<LinkId> nodeIds,
         CancellationToken cancellationToken)
     {
         var parameters = new MultipleLinkActionParameters { LinkIds = nodeIds.Select(x => x.Value) };
 
-        await client.DeleteChildrenAsync(shareId, folder.Id, parameters, cancellationToken).ConfigureAwait(false);
+        await client.DeleteChildrenAsync(folderIdentity.ShareId, folderIdentity.NodeId, parameters, cancellationToken).ConfigureAwait(false);
     }
 
-    internal static async Task<FolderNode> CreateAsync(
+    internal static async Task<FolderNode> CreateFolderAsync(
         ProtonDriveClient client,
         IShareForCommand share,
         INodeIdentity parentFolder,
         string name,
         CancellationToken cancellationToken)
     {
-        using var parentFolderKey = await GetKeyAsync(client, share.Id, parentFolder.VolumeId, parentFolder.Id, cancellationToken).ConfigureAwait(false);
-        using var signingKey = await client.Account.GetAddressPrimaryKeyAsync(share.MembershipAddressId, cancellationToken).ConfigureAwait(false);
-        var parentHashKey = await GetHashKeyAsync(client, share.Id, parentFolder.VolumeId, parentFolder.Id, cancellationToken).ConfigureAwait(false);
+        var newFolderNodeIdentity = new NodeIdentity { ShareId = share.ShareId, VolumeId = parentFolder.VolumeId, NodeId = parentFolder.NodeId };
+
+        using var parentFolderKey = await Node.GetKeyAsync(client, newFolderNodeIdentity, cancellationToken).ConfigureAwait(false);
+        using var signingKey = await client.Account.GetAddressPrimaryKeyAsync(new AddressId(share.MembershipAddressId), cancellationToken).ConfigureAwait(false);
+        var parentHashKey = await Node.GetHashKeyAsync(client, newFolderNodeIdentity, cancellationToken).ConfigureAwait(false);
 
         var hashKey = RandomNumberGenerator.GetBytes(32);
 
-        GetCommonCreationParameters(
+        Node.GetCommonCreationParameters(
             name,
             parentFolderKey,
             parentHashKey.Span,
@@ -98,7 +104,7 @@ public sealed class FolderNode(
         {
             Name = encryptedName,
             NameHashDigest = nameHashDigest,
-            ParentLinkId = parentFolder.Id.Value,
+            ParentLinkId = parentFolder.NodeId.Value,
             Passphrase = encryptedKeyPassphrase,
             PassphraseSignature = keyPassphraseSignature,
             SignatureEmailAddress = share.MembershipEmailAddress,
@@ -106,15 +112,26 @@ public sealed class FolderNode(
             HashKey = key.EncryptAndSign(hashKey, key),
         };
 
-        var response = await client.FoldersApi.CreateFolderAsync(share.Id, parameters, cancellationToken).ConfigureAwait(false);
+        var response = await client.FoldersApi.CreateFolderAsync(share.ShareId, parameters, cancellationToken).ConfigureAwait(false);
 
-        var id = new LinkId(response.FolderId.Value);
+        var folderId = new LinkId(response.FolderId.Value);
 
-        client.SecretsCache.Set(GetNodeKeyCacheKey(parentFolder.VolumeId, id), key.ToBytes());
-        client.SecretsCache.Set(GetNameSessionKeyCacheKey(parentFolder.VolumeId, id), nameSessionKey.Export().Token);
-        client.SecretsCache.Set(GetPassphraseSessionKeyCacheKey(parentFolder.VolumeId, id), passphraseSessionKey.Export().Token);
-        client.SecretsCache.Set(GetHashKeyCacheKey(parentFolder.VolumeId, id), hashKey);
+        client.SecretsCache.Set(Node.GetNodeKeyCacheKey(parentFolder.VolumeId, folderId), key.ToBytes());
+        client.SecretsCache.Set(Node.GetNameSessionKeyCacheKey(parentFolder.VolumeId, folderId), nameSessionKey.Export().Token);
+        client.SecretsCache.Set(Node.GetPassphraseSessionKeyCacheKey(parentFolder.VolumeId, folderId), passphraseSessionKey.Export().Token);
+        client.SecretsCache.Set(Node.GetHashKeyCacheKey(parentFolder.VolumeId, folderId), hashKey);
 
-        return new FolderNode(parentFolder.VolumeId, id, parentFolder.Id, name, nameHashDigest, NodeState.Active);
+        return new FolderNode
+        {
+            NodeIdentity = new NodeIdentity
+            {
+                VolumeId = parentFolder.VolumeId,
+                NodeId = folderId,
+            },
+            ParentId = parentFolder.NodeId,
+            Name = name,
+            NameHashDigest = ByteString.CopyFrom(nameHashDigest.ToArray()),
+            State = NodeState.Active,
+        };
     }
 }

@@ -2,13 +2,12 @@
 
 public static class ProtonDriveClientExtensions
 {
-    public static IAsyncEnumerable<Node> GetFolderChildrenAsync(
+    public static IAsyncEnumerable<INode> GetFolderChildrenAsync(
         this ProtonDriveClient client,
-        ShareId shareId,
-        INodeIdentity folder,
+        NodeIdentity folderIdentity,
         CancellationToken cancellationToken,
         bool includeHidden = false)
     {
-        return client.GetFolderChildrenAsync(shareId, folder.VolumeId, folder.Id, cancellationToken, includeHidden);
+        return client.GetFolderChildrenAsync(folderIdentity, cancellationToken, includeHidden);
     }
 }

@@ -10,15 +10,14 @@ public sealed class FileDownloader
     }
 
     public async Task<VerificationStatus> DownloadAsync(
-        ShareId shareId,
-        INodeIdentity file,
+        INodeIdentity fileIdentity,
         IRevisionForTransfer revision,
         Stream contentOutputStream,
         CancellationToken cancellationToken)
     {
         try
         {
-            using var revisionReader = await Revision.OpenForReadingAsync(_client, shareId, file, revision, cancellationToken).ConfigureAwait(false);
+            using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken).ConfigureAwait(false);
 
             return await revisionReader.ReadAsync(contentOutputStream, cancellationToken).ConfigureAwait(false);
         }

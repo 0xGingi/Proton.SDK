@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Proton.Sdk.CExports;
@@ -7,7 +7,7 @@ namespace Proton.Sdk.Drive.CExports;
 
 internal static class InteropRevisionWriter
 {
-    internal static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out RevisionWriter reader)
+    private static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out RevisionWriter reader)
     {
         var gcHandle = GCHandle.FromIntPtr(handle);
 
@@ -17,7 +17,7 @@ internal static class InteropRevisionWriter
     }
 
     [UnmanagedCallersOnly(EntryPoint = "revision_writer_write_to_path", CallConvs = [typeof(CallConvCdecl)])]
-    private static int Write(nint writerHandle, InteropArray targetFilePath, long lastModificationTime, InteropAsyncCallback<byte> callback)
+    private static int NativeWrite(nint writerHandle, InteropArray revisionWriteRequestBytes, InteropAsyncCallback callback)
     {
         try
         {
@@ -26,7 +26,8 @@ internal static class InteropRevisionWriter
                 return -1;
             }
 
-            callback.InvokeFor(ct => WriteAsync(writer, targetFilePath.Utf8ToString(), DateTimeOffset.FromUnixTimeSeconds(lastModificationTime).UtcDateTime, ct));
+            callback.InvokeFor(ct => InteropWriteAsync(writer, revisionWriteRequestBytes, ct));
+
             return 0;
         }
         catch
@@ -35,22 +36,25 @@ internal static class InteropRevisionWriter
         }
     }
 
-    private static async ValueTask<Result<byte, SdkError>> WriteAsync(RevisionWriter writer, string targetFilePath, DateTime lastModificationTime, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropWriteAsync(RevisionWriter writer, InteropArray revisionWriteRequestBytes, CancellationToken cancellationToken)
     {
         try
         {
-            await writer.WriteAsync(targetFilePath, lastModificationTime, cancellationToken).ConfigureAwait(false);
+            var revisionWriteRequest = RevisionWriteRequest.Parser.ParseFrom(revisionWriteRequestBytes.ToArray());
+            var lastModificationTime = DateTimeOffset.FromUnixTimeSeconds(revisionWriteRequest.LastModificationDate).DateTime;
 
-            return (byte)VerificationStatus.Ok;
+            await writer.WriteAsync(revisionWriteRequest.TargetFilePath, lastModificationTime, cancellationToken).ConfigureAwait(false);
+
+            return ResultExtensions.Success(new VerificationStatusResponse { VerificationStatus = VerificationStatus.Ok });
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            return SdkError.FromException(ex);
+            return ResultExtensions.Failure(-5, e.Message);
         }
     }
 
     [UnmanagedCallersOnly(EntryPoint = "revision_writer_free", CallConvs = [typeof(CallConvCdecl)])]
-    private static void Free(nint handle)
+    private static void NativeFree(nint handle)
     {
         try
         {

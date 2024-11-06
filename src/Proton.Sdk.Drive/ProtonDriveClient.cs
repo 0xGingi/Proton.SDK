@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Devices;
@@ -20,12 +20,12 @@ public sealed class ProtonDriveClient
     /// Creates a new instance of <see cref="ProtonDriveClient"/>.
     /// </summary>
     /// <param name="session">Authentication session</param>
-    /// <param name="id">Unique identifier for this client used to identify draft revisions that it may re-use.</param>
-    public ProtonDriveClient(ProtonApiSession session, string? id = default)
+    /// <param name="clientId">Unique identifier for this client used to identify draft revisions that it may re-use.</param>
+    public ProtonDriveClient(ProtonApiSession session, string? clientId = default)
     {
         _httpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute);
 
-        Id = id ?? Guid.NewGuid().ToString();
+        ClientId = clientId ?? Guid.NewGuid().ToString();
 
         Account = new ProtonAccountClient(session);
         SecretsCache = session.SecretsCache;
@@ -40,7 +40,7 @@ public sealed class ProtonDriveClient
         Logger = session.LoggerFactory.CreateLogger<ProtonDriveClient>();
     }
 
-    public string Id { get; }
+    public string ClientId { get; }
 
     internal static RecyclableMemoryStreamManager MemoryStreamManager { get; } = new();
 
@@ -60,7 +60,7 @@ public sealed class ProtonDriveClient
     internal BlockDownloader BlockDownloader { get; }
     internal FifoFlexibleSemaphore RevisionBlockListingSemaphore { get; }
     internal FifoFlexibleSemaphore RevisionCreationSemaphore { get; }
-    internal ILogger<ProtonDriveClient> Logger { get; }
+    private ILogger<ProtonDriveClient> Logger { get; }
 
     public Task<Volume[]> GetVolumesAsync(CancellationToken cancellationToken)
     {
@@ -82,22 +82,23 @@ public sealed class ProtonDriveClient
         return Share.DeleteFromTrashAsync(SharesApi, shareId, nodeIds, cancellationToken);
     }
 
-    public Task<Node> GetNodeAsync(ShareId shareId, LinkId nodeId, CancellationToken cancellationToken)
+    public Task<INode> GetNodeAsync(ShareId shareId, LinkId nodeId, CancellationToken cancellationToken)
     {
         return Node.GetAsync(this, shareId, nodeId, cancellationToken);
     }
 
-    public IAsyncEnumerable<Node> GetFolderChildrenAsync(
-        ShareId shareId,
-        VolumeId volumeId,
-        LinkId folderId,
+    public IAsyncEnumerable<INode> GetFolderChildrenAsync(
+        INodeIdentity folderIdentity,
         CancellationToken cancellationToken,
         bool includeHidden = false)
     {
-        return FolderNode.GetChildrenAsync(this, shareId, volumeId, folderId, includeHidden, cancellationToken);
+        return FolderNode.GetFolderChildrenAsync(this, folderIdentity, includeHidden, cancellationToken);
     }
 
-    public async Task<FileUploader> WaitForFileUploaderAsync(long size, int numberOfSamples, CancellationToken cancellationToken)
+    public async Task<FileUploader> WaitForFileUploaderAsync(
+        long size,
+        int numberOfSamples,
+        CancellationToken cancellationToken)
     {
         var expectedNumberOfBlocks = (int)size.DivideAndRoundUp(RevisionWriter.DefaultBlockSize) + numberOfSamples;
 
@@ -113,61 +114,62 @@ public sealed class ProtonDriveClient
         return new FileDownloader(this);
     }
 
-    public Task<Revision[]> GetFileRevisionsAsync(ShareId shareId, INodeIdentity file, CancellationToken cancellationToken)
+    public Task<Revision[]> GetFileRevisionsAsync(INodeIdentity fileIdentity, CancellationToken cancellationToken)
     {
-        return FileNode.GetRevisionsAsync(this, shareId, file, cancellationToken);
+        return FileNode.GetFileRevisionsAsync(this, fileIdentity, cancellationToken);
     }
 
-    public Task<Revision> GetFileRevisionAsync(ShareId shareId, INodeIdentity file, RevisionId revisionId, CancellationToken cancellationToken)
+    public Task<Revision> GetFileRevisionAsync(NodeIdentity nodeIdentity, RevisionId revisionId, CancellationToken cancellationToken)
     {
-        return FileNode.GetRevisionAsync(this, shareId, file, revisionId, cancellationToken);
+        return FileNode.GetFileRevisionAsync(this, nodeIdentity, revisionId, cancellationToken);
     }
 
-    public Task DeleteRevisionAsync(IRevisionShareBasedIdentity revision, CancellationToken cancellationToken)
+    public Task DeleteRevisionAsync(ShareBasedRevisionIdentity shareBasedRevisionIdentity, CancellationToken cancellationToken)
     {
-        return Revision.DeleteAsync(FilesApi, revision.ShareId, revision.FileId, revision.Id, cancellationToken);
-    }
-
-    public Task DeleteRevisionAsync(ShareId shareId, INodeIdentity file, RevisionId revisionId, CancellationToken cancellationToken)
-    {
-        return Revision.DeleteAsync(FilesApi, shareId, file.Id, revisionId, cancellationToken);
+        return Revision.DeleteAsync(FilesApi, shareBasedRevisionIdentity, cancellationToken);
     }
 
     public Task<FolderNode> CreateFolderAsync(IShareForCommand share, INodeIdentity parentFolder, string name, CancellationToken cancellationToken)
     {
-        return FolderNode.CreateAsync(this, share, parentFolder, name, cancellationToken);
+        return FolderNode.CreateFolderAsync(this, share, parentFolder, name, cancellationToken);
     }
 
-    public Task TrashNodesAsync(ShareId shareId, INodeIdentity folder, IEnumerable<LinkId> nodeIds, CancellationToken cancellationToken)
+    public Task TrashNodesAsync(INodeIdentity folderIdentity, IEnumerable<LinkId> nodeIds, CancellationToken cancellationToken)
     {
-        return FolderNode.TrashChildrenAsync(FoldersApi, shareId, folder, nodeIds, cancellationToken);
+        return FolderNode.TrashFolderChildrenAsync(FoldersApi, folderIdentity, nodeIds, cancellationToken);
     }
 
-    public Task DeleteNodesAsync(ShareId shareId, INodeIdentity folder, IEnumerable<LinkId> nodeIds, CancellationToken cancellationToken)
+    public Task DeleteNodesAsync(INodeIdentity folderIdentity, IEnumerable<LinkId> nodeIds, CancellationToken cancellationToken)
     {
-        return FolderNode.DeleteChildrenAsync(FoldersApi, shareId, folder, nodeIds, cancellationToken);
+        return FolderNode.DeleteFolderChildrenAsync(FoldersApi, folderIdentity, nodeIds, cancellationToken);
     }
 
     public Task MoveNodeAsync(
         ShareId shareId,
-        INodeForMove node,
-        LinkId parentFolderId,
+        INode node,
         IShareForCommand destinationShare,
-        INodeIdentity destinationFolder,
+        INodeIdentity destinationFolderIdentity,
         string nameAtDestination,
         CancellationToken cancellationToken)
     {
-        return Node.MoveAsync(this, shareId, node, parentFolderId, destinationShare, destinationFolder, nameAtDestination, cancellationToken);
+        // TODO: Assert parentFolderID is present?
+        return Node.MoveAsync(
+            this,
+            shareId,
+            node,
+            destinationShare,
+            destinationFolderIdentity,
+            nameAtDestination,
+            cancellationToken);
     }
 
     public Task RenameNodeAsync(
         IShareForCommand share,
-        INodeForRename node,
-        LinkId parentFolderId,
+        INode node,
         string newName,
         string newMediaType,
         CancellationToken cancellationToken)
     {
-        return Node.RenameAsync(this, share, node, parentFolderId, newName, newMediaType, cancellationToken);
+        return Node.RenameAsync(this, share, node, /*parentFolderId,*/ newName, newMediaType, cancellationToken);
     }
 }

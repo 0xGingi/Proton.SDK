@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Srp;
 using Proton.Sdk.Authentication;
@@ -16,7 +17,7 @@ public sealed class ProtonApiSession
     private Action? _ended;
 
     private ProtonApiSession(
-        string id,
+        SessionId sessionId,
         string username,
         UserId userId,
         TokenCredential tokenCredential,
@@ -31,7 +32,7 @@ public sealed class ProtonApiSession
 
         Username = username;
         UserId = userId;
-        Id = id;
+        SessionId = sessionId;
         TokenCredential = tokenCredential;
         Scopes = scopes.ToArray().AsReadOnly();
         IsWaitingForSecondFactorCode = isWaitingForSecondFactorCode;
@@ -54,7 +55,7 @@ public sealed class ProtonApiSession
         }
     }
 
-    public string Id { get; }
+    public SessionId SessionId { get; }
 
     public string Username { get; }
 
@@ -77,18 +78,11 @@ public sealed class ProtonApiSession
     private AuthenticationApiClient AuthenticationApi => new(_httpClient);
     private KeysApiClient KeysApi => new(_httpClient);
 
-    public static Task<ProtonApiSession> BeginAsync(string username, ReadOnlyMemory<byte> password, CancellationToken cancellationToken)
-    {
-        return BeginAsync(username, password, new ProtonClientOptions(), cancellationToken);
-    }
-
     public static async Task<ProtonApiSession> BeginAsync(
-        string username,
-        ReadOnlyMemory<byte> password,
-        ProtonClientOptions options,
+        SessionBeginRequest sessionBeginRequest,
         CancellationToken cancellationToken)
     {
-        var configuration = new ProtonClientConfiguration(options);
+        var configuration = new ProtonClientConfiguration(sessionBeginRequest.Options);
 
         var logger = configuration.LoggerFactory.CreateLogger<ProtonApiSession>();
 
@@ -96,19 +90,19 @@ public sealed class ProtonApiSession
 
         var authApiClient = new AuthenticationApiClient(httpClient);
 
-        var sessionInitiationResponse = await authApiClient.InitiateSessionAsync(username, cancellationToken)
+        var sessionInitiationResponse = await authApiClient.InitiateSessionAsync(sessionBeginRequest.Username, cancellationToken)
             .ConfigureAwait(false);
 
         var srpClient = SrpClient.Create(
-            username,
-            password.Span,
+            sessionBeginRequest.Username,
+            Encoding.UTF8.GetBytes(sessionBeginRequest.Password),
             sessionInitiationResponse.Salt.Span,
             sessionInitiationResponse.Modulus,
             SrpClient.GetDefaultModulusVerificationKey());
 
         var srpClientHandshake = srpClient.ComputeHandshake(sessionInitiationResponse.ServerEphemeral.Span, 2048);
 
-        var authResponse = await authApiClient.AuthenticateAsync(sessionInitiationResponse, srpClientHandshake, username, cancellationToken)
+        var authResponse = await authApiClient.AuthenticateAsync(sessionInitiationResponse, srpClientHandshake, sessionBeginRequest.Username, cancellationToken)
             .ConfigureAwait(false);
 
         var tokenCredential = new TokenCredential(
@@ -119,21 +113,21 @@ public sealed class ProtonApiSession
             configuration.LoggerFactory.CreateLogger<TokenCredential>());
 
         var session = new ProtonApiSession(
-            authResponse.SessionId,
-            username,
+            new SessionId(authResponse.SessionId),
+            sessionBeginRequest.Username,
             new UserId(authResponse.UserId),
             tokenCredential,
             authResponse.Scopes,
             authResponse.SecondFactorParameters?.IsEnabled == true,
             authResponse.PasswordMode,
-            new ProtonClientConfiguration(options),
+            new ProtonClientConfiguration(sessionBeginRequest.Options),
             logger);
 
         if (session is { IsWaitingForSecondFactorCode: false, PasswordMode: PasswordMode.Single })
         {
             try
             {
-                await session.ApplyDataPasswordAsync(password, cancellationToken).ConfigureAwait(false);
+                await session.ApplyDataPasswordAsync(Encoding.UTF8.GetBytes(sessionBeginRequest.Password), cancellationToken).ConfigureAwait(false);
             }
             catch
             {
@@ -145,70 +139,57 @@ public sealed class ProtonApiSession
         return session;
     }
 
-    public static ProtonApiSession Resume(
-        string id,
-        string username,
-        UserId userId,
-        string accessToken,
-        string refreshToken,
-        IEnumerable<string> scopes,
-        bool isWaitingForSecondFactorCode,
-        PasswordMode passwordMode,
-        ProtonClientOptions options)
+    public static ProtonApiSession Resume(SessionResumeRequest sessionResumeRequest)
     {
-        var configuration = new ProtonClientConfiguration(options);
+        var configuration = new ProtonClientConfiguration(sessionResumeRequest.Options);
 
         var logger = configuration.LoggerFactory.CreateLogger<ProtonApiSession>();
 
         var tokenCredential = new TokenCredential(
             new AuthenticationApiClient(configuration.GetHttpClient()),
-            id,
-            accessToken,
-            refreshToken,
+            sessionResumeRequest.SessionId.Value,
+            sessionResumeRequest.AccessToken,
+            sessionResumeRequest.RefreshToken,
             configuration.LoggerFactory.CreateLogger<TokenCredential>());
 
         var session = new ProtonApiSession(
-            id,
-            username,
-            userId,
+            sessionResumeRequest.SessionId,
+            sessionResumeRequest.Username,
+            sessionResumeRequest.UserId,
             tokenCredential,
-            scopes,
-            isWaitingForSecondFactorCode,
-            passwordMode,
+            sessionResumeRequest.Scopes,
+            sessionResumeRequest.IsWaitingForSecondFactorCode,
+            sessionResumeRequest.PasswordMode,
             configuration,
-            logger);
+            logger
+        );
 
-        logger.Log(LogLevel.Information, "Session {SessionId} was resumed", session.Id);
+        logger.Log(LogLevel.Information, "Session {SessionId} was resumed", session.SessionId);
 
         return session;
     }
 
     public static ProtonApiSession Renew(
         ProtonApiSession expiredSession,
-        string id,
-        string accessToken,
-        string refreshToken,
-        IEnumerable<string> scopes,
-        bool isWaitingForSecondFactorCode,
-        PasswordMode passwordMode)
+        SessionRenewRequest sessionRenewRequest)
     {
         var tokenCredential = new TokenCredential(
             new AuthenticationApiClient(expiredSession.Configuration.GetHttpClient()),
-            id,
-            accessToken,
-            refreshToken,
+            sessionRenewRequest.SessionId.Value,
+            sessionRenewRequest.AccessToken,
+            sessionRenewRequest.RefreshToken,
             expiredSession.Configuration.LoggerFactory.CreateLogger<TokenCredential>());
 
         var logger = expiredSession.Configuration.LoggerFactory.CreateLogger<ProtonApiSession>();
 
         return new ProtonApiSession(
-            id,
+            sessionRenewRequest.SessionId,
             expiredSession.Username,
             expiredSession.UserId,
             tokenCredential,
-            scopes,
-            isWaitingForSecondFactorCode,
-            passwordMode,
+            sessionRenewRequest.Scopes,
+            sessionRenewRequest.IsWaitingForSecondFactorCode,
+            sessionRenewRequest.PasswordMode,
             expiredSession.Configuration,
             logger);
     }

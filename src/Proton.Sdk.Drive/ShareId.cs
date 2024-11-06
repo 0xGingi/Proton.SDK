@@ -1,11 +1,7 @@
 ﻿namespace Proton.Sdk.Drive;
 
-public readonly record struct ShareId(string Value)
+public sealed partial class ShareId : IFormattableValue
 {
-    internal string Value { get; } = Value;
-
-    public override string ToString()
-    {
-        return Value;
-    }
+    public ShareId(string str)
+        : this(new ShareId { Value = str }) { }
 }

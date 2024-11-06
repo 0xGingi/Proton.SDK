@@ -1,11 +1,7 @@
 ﻿namespace Proton.Sdk.Drive;
 
-public readonly record struct VolumeId(string Value)
+public sealed partial class VolumeId : IFormattableValue
 {
-    internal string Value { get; } = Value;
-
-    public override string ToString()
-    {
-        return Value;
-    }
+    public VolumeId(string str)
+        : this(new VolumeId { Value = str }) { }
 }

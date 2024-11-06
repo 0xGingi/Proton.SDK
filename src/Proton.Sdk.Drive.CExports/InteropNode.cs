@@ -1,5 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.CExports;
 
@@ -8,13 +9,10 @@ namespace Proton.Sdk.Drive.CExports;
 internal static class InteropNode
 {
     [UnmanagedCallersOnly(EntryPoint = "node_decrypt_armored_name", CallConvs = [typeof(CallConvCdecl)])]
-    private static int DecryptName(
+    private static int NativeDecryptName(
         nint clientHandle,
-        InteropArray shareId,
-        InteropArray volumeId,
-        InteropArray parentLinkId,
-        InteropArray armoredEncryptedName,
-        InteropAsyncCallback<InteropArray> callback)
+        InteropArray nodeNameDecryptionRequestBytes,
+        InteropAsyncCallback callback)
     {
         try
         {
@@ -24,13 +22,7 @@ internal static class InteropNode
             }
 
             callback.InvokeFor(
-                ct => DecryptNameAsync(
-                    client,
-                    new ShareId(shareId.Utf8ToString()),
-                    new VolumeId(volumeId.Utf8ToString()),
-                    new LinkId(parentLinkId.Utf8ToString()),
-                    armoredEncryptedName.ToArray(),
-                    ct));
+                ct => InteropDecryptNameAsync(client, nodeNameDecryptionRequestBytes, ct));
 
             return 0;
         }
@@ -40,26 +32,28 @@ internal static class InteropNode
         }
     }
 
-    private static async ValueTask<Result<InteropArray, SdkError>> DecryptNameAsync(
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropDecryptNameAsync(
         ProtonDriveClient client,
-        ShareId shareId,
-        VolumeId volumeId,
-        LinkId parentLinkId,
-        byte[] armoredEncryptedName,
+        InteropArray nodeNameDecryptionRequestBytes,
         CancellationToken cancellationToken)
     {
         try
         {
-            using var parentKey = await Node.GetKeyAsync(client, shareId, volumeId, parentLinkId, cancellationToken).ConfigureAwait(false);
+            var nodeNameDecryptionRequest = NodeNameDecryptionRequest.Parser.ParseFrom(nodeNameDecryptionRequestBytes.AsReadOnlySpan());
+
+            using var parentKey = await Node.GetKeyAsync(
+                client,
+                nodeNameDecryptionRequest.NodeIdentity,
+                cancellationToken).ConfigureAwait(false);
 
             // TODO: verification
-            var name = parentKey.DecryptText(armoredEncryptedName, PgpEncoding.AsciiArmor);
+            var name = parentKey.DecryptText(Encoding.UTF8.GetBytes(nodeNameDecryptionRequest.ArmoredEncryptedName).AsMemory().Span, PgpEncoding.AsciiArmor);
 
-            return InteropArray.Utf8FromString(name);
+            return ResultExtensions.Success(name);
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            return SdkError.FromException(ex);
+            return ResultExtensions.Failure(-6, e.Message);
         }
     }
 }
