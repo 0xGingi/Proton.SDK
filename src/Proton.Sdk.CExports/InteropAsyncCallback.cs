@@ -12,8 +12,11 @@ internal readonly unsafe struct InteropAsyncCallback
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal readonly unsafe struct InteropProgressCallback
+internal readonly unsafe struct InteropAsyncCallbackWithProgress
 {
     public readonly void* State;
-    public readonly delegate* unmanaged[Cdecl]<void*, long, void> OnProgress;
+    public readonly delegate* unmanaged[Cdecl]<void*, long, long, void> OnProgress;
+    public readonly delegate* unmanaged[Cdecl]<void*, InteropArray, void> OnSuccess;
+    public readonly delegate* unmanaged[Cdecl]<void*, InteropArray, void> OnFailure;
+    public readonly nint CancellationTokenSourceHandle;
 }

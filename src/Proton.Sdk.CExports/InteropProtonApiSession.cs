@@ -19,6 +19,7 @@ internal static class InteropProtonApiSession
 
     [UnmanagedCallersOnly(EntryPoint = "session_begin", CallConvs = [typeof(CallConvCdecl)])]
     private static int NativeBegin(
+        nint unused,
         InteropArray sessionBeginRequestBytes,
         InteropAsyncCallback callback)
     {

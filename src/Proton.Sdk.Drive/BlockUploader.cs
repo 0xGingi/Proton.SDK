@@ -34,7 +34,7 @@ internal sealed class BlockUploader
         BlockVerifier verifier,
         byte[] plainDataPrefix,
         int plainDataPrefixLength,
-        Action<long> onProgress,
+        Action<long> onBlockProgress,
         Action<int> releaseBlocksAction,
         CancellationToken cancellationToken)
     {
@@ -109,7 +109,7 @@ internal sealed class BlockUploader
 
                     await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
 
-                    onProgress?.Invoke(dataPacketStream.Length);
+                    onBlockProgress?.Invoke(dataPacketStream.Position);
 
                     return sha256Digest;
                 }

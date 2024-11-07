@@ -113,27 +113,27 @@ public sealed partial class Revision : IRevisionForTransfer
 
     internal static async Task<RevisionWriter> OpenForWritingAsync(
         ProtonDriveClient client,
-        FileWriteRequest fileWriteRequest,
+        RevisionUploadRequest revisionUploadRequest,
         Action<int> releaseBlocksAction,
         CancellationToken cancellationToken)
     {
-        if (fileWriteRequest.RevisionMetadata.State is not RevisionState.Draft)
+        if (revisionUploadRequest.RevisionMetadata.State is not RevisionState.Draft)
         {
             throw new InvalidOperationException("Non-draft revision cannot be opened for writing");
         }
 
-        var fileKey = await Node.GetKeyAsync(client, fileWriteRequest.NodeIdentity, cancellationToken).ConfigureAwait(false);
-        var contentKey = await FileNode.GetFileContentKeyAsync(client, fileWriteRequest.NodeIdentity, cancellationToken).ConfigureAwait(false);
-        var signingKey = await client.Account.GetAddressPrimaryKeyAsync(fileWriteRequest.ShareMetadata.MembershipAddressId, cancellationToken).ConfigureAwait(false);
+        var fileKey = await Node.GetKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken).ConfigureAwait(false);
+        var contentKey = await FileNode.GetFileContentKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken).ConfigureAwait(false);
+        var signingKey = await client.Account.GetAddressPrimaryKeyAsync(revisionUploadRequest.ShareMetadata.MembershipAddressId, cancellationToken).ConfigureAwait(false);
 
         await client.BlockUploader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         const int targetBlockSize = RevisionWriter.DefaultBlockSize;
         var writer = new RevisionWriter(
             client,
-            fileWriteRequest.ShareMetadata,
-            fileWriteRequest.NodeIdentity.NodeId,
-            fileWriteRequest.RevisionMetadata.RevisionId,
+            revisionUploadRequest.ShareMetadata,
+            revisionUploadRequest.FileIdentity.NodeId,
+            revisionUploadRequest.RevisionMetadata.RevisionId,
             fileKey,
             contentKey,
             signingKey,

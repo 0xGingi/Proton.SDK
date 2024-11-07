@@ -31,7 +31,7 @@ public sealed class RevisionReader : IDisposable
         _revisionResponse = revisionResponse;
     }
 
-    public async Task<VerificationStatus> ReadAsync(Stream contentOutputStream, CancellationToken cancellationToken)
+    public async Task<VerificationStatus> ReadAsync(Stream contentOutputStream, Action<long, long> onProgress, CancellationToken cancellationToken)
     {
         var downloadTasks = new Queue<Task<BlockDownloadResult>>(_client.BlockDownloader.MaxDegreeOfParallelism);
         var manifestStream = ProtonDriveClient.MemoryStreamManager.GetStream();

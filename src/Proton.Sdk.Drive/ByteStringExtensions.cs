@@ -9,6 +9,6 @@ public static class ByteStringExtensions
 {
     internal static ByteString FromMemory(ReadOnlyMemory<byte>? memory)
     {
-        return memory is not null ? ByteString.CopyFrom(memory.Value.Span) : ByteString.Empty;
+        return memory is not null ? UnsafeByteOperations.UnsafeWrap(memory.Value) : ByteString.Empty;
     }
 }

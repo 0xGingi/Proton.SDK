@@ -25,7 +25,6 @@ public sealed class RevisionWriter : IDisposable
     private readonly int _maxBlockSize;
 
     private bool _semaphoreReleased;
-    private long _numberOfBytesUploaded;
 
     internal RevisionWriter(
         ProtonDriveClient client,
@@ -51,15 +50,15 @@ public sealed class RevisionWriter : IDisposable
         _maxBlockSize = maxBlockSize;
     }
 
-    public event Action<long>? ProgressUpdated;
-
     public async Task WriteAsync(
         Stream contentInputStream,
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
-        Action<long> onProgress,
+        Action<long, long> onProgress,
         CancellationToken cancellationToken)
     {
+        long numberOfBytesUploaded = 0;
+
         var signinEmailAddress = _shareMetadata.MembershipEmailAddress;
 
         var uploadTasks = new Queue<Task<byte[]>>(_client.BlockUploader.MaxDegreeOfParallelism);
@@ -121,8 +120,8 @@ public sealed class RevisionWriter : IDisposable
                                 (int)Math.Min(blockVerifier.DataPacketPrefixMaxLength, plainDataStream.Length),
                                 (progress) =>
                                 {
-                                    _numberOfBytesUploaded += progress;
-                                    ProgressUpdated?.Invoke(_numberOfBytesUploaded);
+                                    numberOfBytesUploaded += progress;
+                                    onProgress(numberOfBytesUploaded, contentInputStream.Length);
                                 },
                                 _releaseBlocksAction,
                                 cancellationToken);

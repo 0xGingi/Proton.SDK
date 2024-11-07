@@ -30,21 +30,16 @@ public sealed partial class FileNode : INode
         }
     }
 
-    internal static async Task<FileCreationResponse> CreateFileAsync(
+    internal static async Task<FileUploadResponse> CreateFileAsync(
         ProtonDriveClient client,
-        FileCreationRequest fileCreationRequest,
+        FileUploadRequest fileUploadRequest,
         CancellationToken cancellationToken)
     {
-        var parentFolderIdentity = new NodeIdentity
-        {
-            NodeId = fileCreationRequest.ParentFolderIdentity.NodeId,
-            VolumeId = fileCreationRequest.ParentFolderIdentity.VolumeId,
-            ShareId = fileCreationRequest.ShareMetadata.ShareId,
-        };
+        var parentFolderIdentity = fileUploadRequest.ParentFolderIdentity;
         var parentFolderKey = await Node.GetKeyAsync(client, parentFolderIdentity, cancellationToken).ConfigureAwait(false);
 
         var signingKey = await client.Account.GetAddressPrimaryKeyAsync(
-            fileCreationRequest.ShareMetadata.MembershipAddressId,
+            fileUploadRequest.ShareMetadata.MembershipAddressId,
             cancellationToken
         ).ConfigureAwait(false);
 
@@ -55,7 +50,7 @@ public sealed partial class FileNode : INode
             .ConfigureAwait(false);
 
         Node.GetCommonCreationParameters(
-            fileCreationRequest.Name,
+            fileUploadRequest.Name,
             parentFolderKey,
             parentFolderHashKey.Span,
             signingKey,
@@ -76,12 +71,12 @@ public sealed partial class FileNode : INode
             ClientId = client.ClientId,
             Name = encryptedName,
             NameHashDigest = nameHashDigest,
-            ParentLinkId = fileCreationRequest.ParentFolderIdentity.NodeId.Value,
+            ParentLinkId = fileUploadRequest.ParentFolderIdentity.NodeId.Value,
             Passphrase = encryptedKeyPassphrase,
             PassphraseSignature = passphraseSignature,
-            SignatureEmailAddress = fileCreationRequest.ShareMetadata.MembershipEmailAddress,
+            SignatureEmailAddress = fileUploadRequest.ShareMetadata.MembershipEmailAddress,
             Key = lockedKeyBytes,
-            MediaType = fileCreationRequest.MimeType,
+            MediaType = fileUploadRequest.MimeType,
             ContentKeyPacket = key.EncryptSessionKey(contentKey),
             ContentKeyPacketSignature = key.Sign(contentKeyToken),
         };
@@ -119,8 +114,8 @@ public sealed partial class FileNode : INode
                 NodeId = createdNodeId,
                 ShareId = parentFolderIdentity.ShareId,
             },
-            ParentId = fileCreationRequest.ParentFolderIdentity.NodeId,
-            Name = fileCreationRequest.Name,
+            ParentId = fileUploadRequest.ParentFolderIdentity.NodeId,
+            Name = fileUploadRequest.Name,
             NameHashDigest = ByteString.CopyFrom(nameHashDigest),
             State = NodeState.Draft,
         };
@@ -133,7 +128,7 @@ public sealed partial class FileNode : INode
             0,
             default);
 
-        return new FileCreationResponse
+        return new FileUploadResponse
         {
             File = file,
             Revision = draftRevision,

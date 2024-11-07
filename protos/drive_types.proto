@@ -144,42 +144,58 @@ message ShareBasedRevisionIdentity {
     ShareId shareId = 1;
     LinkId node_id = 2;
     RevisionId revision_id = 3;
-    // optional VolumeId volume_id = 4;
 }
 
-// Mark: - File operations
+// Mark: - Downloads
 
-message FileCreationRequest {
-    ShareMetadata share_metadata = 1;
-    NodeIdentity parent_folder_identity = 2;
-    string name = 3;
-    string mimeType = 4;
-}
-
-message FileCreationResponse {
-    FileNode file = 1;
-    Revision revision = 2;
-}
-
-message FileReadRequest {
-    NodeIdentity node_identity = 1;
+message FileDownloadRequest {
+    NodeIdentity file_identity = 1;
     RevisionMetadata revision_metadata = 2;
     string target_file_path = 3;
 }
 
-message FileWriteRequest {
-    NodeIdentity node_identity = 1;
-    RevisionMetadata revision_metadata = 2;
-    ShareMetadata share_metadata = 3;
+// Mark: - Uploads
+
+// Response: IntResponse
+message FileUploaderCreationRequest {
+    int64 file_size = 1;
+    int32 number_of_samples = 2;
 }
 
-message RevisionWriteRequest {
-    string target_file_path = 1;
-    int64 last_modification_date = 2;
+
+message FileUploadRequest {
+    ShareMetadata share_metadata = 1;
+    NodeIdentity parent_folder_identity = 2;
+    string name = 3;
+    string mimeType = 4;
+    string target_file_path = 5;
+    repeated FileSampleProto samples = 6;
+    int64 last_modification_date = 7;
 }
 
-message RevisionReadRequest {
-    string target_file_path = 1;
+message FileUploadResponse {
+    FileNode file = 1;
+    Revision revision = 2;
+}
+
+// Response is a Revision
+message RevisionUploadRequest {
+    NodeIdentity file_identity = 1;
+    ShareMetadata share_metadata = 2;
+    RevisionMetadata revision_metadata = 3;
+    repeated FileSampleProto samples = 4; // Was: optional bytes
+    int64 last_modification_date = 5;
+    string target_file_path = 6; // Do we need this?
+}
+
+message ProgressUpdate {
+    int64 bytes_completed = 1;
+    int64 bytes_in_total = 2;
+}
+
+message FileSampleProto {
+    FileSampleType type = 1;
+    bytes content = 2;
 }
 
 // Mark: - Other operations
