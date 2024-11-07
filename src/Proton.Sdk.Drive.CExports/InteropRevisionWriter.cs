@@ -43,7 +43,7 @@ internal static class InteropRevisionWriter
             var revisionWriteRequest = RevisionWriteRequest.Parser.ParseFrom(revisionWriteRequestBytes.ToArray());
             var lastModificationTime = DateTimeOffset.FromUnixTimeSeconds(revisionWriteRequest.LastModificationDate).DateTime;
 
-            await writer.WriteAsync(revisionWriteRequest.TargetFilePath, lastModificationTime, cancellationToken).ConfigureAwait(false);
+            await writer.WriteAsync(revisionWriteRequest.TargetFilePath, lastModificationTime, _ => { }, cancellationToken).ConfigureAwait(false);
 
             return ResultExtensions.Success(new VerificationStatusResponse { VerificationStatus = VerificationStatus.Ok });
         }

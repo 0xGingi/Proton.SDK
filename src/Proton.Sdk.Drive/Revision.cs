@@ -51,6 +51,39 @@ public sealed partial class Revision : IRevisionForTransfer
         return revisionMetadata;
     }
 
+    internal static async Task<Revision> CreateAsync(
+        ProtonDriveClient client,
+        IShareForCommand share,
+        INodeIdentity file,
+        RevisionId knownLastRevisionId,
+        CancellationToken cancellationToken)
+    {
+        var parameters = new RevisionCreationParameters
+        {
+            CurrentRevisionId = knownLastRevisionId.Value,
+            ClientId = client.ClientId,
+        };
+
+        RevisionId revisionId;
+        try
+        {
+            var revisionResponse = await client.FilesApi.CreateRevisionAsync(share.ShareId, file.NodeId, parameters, cancellationToken).ConfigureAwait(false);
+
+            revisionId = new RevisionId(revisionResponse.Identity.RevisionId);
+        }
+        catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { DraftClientId: not null, DraftRevisionId: not null } })
+        {
+            if (ex.Response.Conflict.DraftClientId != client.ClientId)
+            {
+                throw;
+            }
+
+            revisionId = new RevisionId(ex.Response.Conflict.DraftRevisionId);
+        }
+
+        return new Revision(file.VolumeId, file.NodeId, revisionId, RevisionState.Draft, 0, default);
+    }
+
     internal static async Task<RevisionReader> OpenForReadingAsync(
         ProtonDriveClient client,
         INodeIdentity fileIdentity,
@@ -81,7 +114,7 @@ public sealed partial class Revision : IRevisionForTransfer
     internal static async Task<RevisionWriter> OpenForWritingAsync(
         ProtonDriveClient client,
         FileWriteRequest fileWriteRequest,
-        Action<long> onProgress,
+        Action<int> releaseBlocksAction,
         CancellationToken cancellationToken)
     {
         if (fileWriteRequest.RevisionMetadata.State is not RevisionState.Draft)
@@ -104,9 +137,9 @@ public sealed partial class Revision : IRevisionForTransfer
             fileKey,
             contentKey,
             signingKey,
+            releaseBlocksAction,
             targetBlockSize,
             targetBlockSize * 3 / 2);
-        writer.ProgressUpdated += onProgress;
         return writer;
     }
 

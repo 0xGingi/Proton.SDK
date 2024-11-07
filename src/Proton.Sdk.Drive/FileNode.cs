@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Google.Protobuf;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
@@ -35,13 +35,13 @@ public sealed partial class FileNode : INode
         FileCreationRequest fileCreationRequest,
         CancellationToken cancellationToken)
     {
-        var parentNodeIdentity = new NodeIdentity
+        var parentFolderIdentity = new NodeIdentity
         {
             NodeId = fileCreationRequest.ParentFolderIdentity.NodeId,
             VolumeId = fileCreationRequest.ParentFolderIdentity.VolumeId,
             ShareId = fileCreationRequest.ShareMetadata.ShareId,
         };
-        var parentFolderKey = await Node.GetKeyAsync(client, parentNodeIdentity, cancellationToken).ConfigureAwait(false);
+        var parentFolderKey = await Node.GetKeyAsync(client, parentFolderIdentity, cancellationToken).ConfigureAwait(false);
 
         var signingKey = await client.Account.GetAddressPrimaryKeyAsync(
             fileCreationRequest.ShareMetadata.MembershipAddressId,
@@ -50,7 +50,7 @@ public sealed partial class FileNode : INode
 
         var parentFolderHashKey = await Node.GetHashKeyAsync(
                 client,
-                parentNodeIdentity,
+                parentFolderIdentity,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -73,6 +73,7 @@ public sealed partial class FileNode : INode
 
         var parameters = new FileCreationParameters
         {
+            ClientId = client.ClientId,
             Name = encryptedName,
             NameHashDigest = nameHashDigest,
             ParentLinkId = fileCreationRequest.ParentFolderIdentity.NodeId.Value,
@@ -89,9 +90,15 @@ public sealed partial class FileNode : INode
         RevisionId createdRevisionId;
         try
         {
-            var response = await client.FilesApi.CreateFileAsync(parentNodeIdentity.ShareId, parameters, cancellationToken).ConfigureAwait(false);
-            createdNodeId = new LinkId(response.RevisionIdentity.LinkId);
-            createdRevisionId = new RevisionId(response.RevisionIdentity.RevisionId);
+            var response = await client.FilesApi.CreateFileAsync(parentFolderIdentity.ShareId, parameters, cancellationToken).ConfigureAwait(false);
+
+            createdNodeId = new LinkId(response.Identities.LinkId);
+            createdRevisionId = new RevisionId(response.Identities.RevisionId);
+
+            client.SecretsCache.Set(Node.GetNodeKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), key.ToBytes());
+            client.SecretsCache.Set(Node.GetNameSessionKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), nameSessionKey.Export().Token);
+            client.SecretsCache.Set(Node.GetPassphraseSessionKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), passphraseSessionKey.Export().Token);
+            client.SecretsCache.Set(Node.GetContentKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), contentKeyToken);
         }
         catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { DraftClientId: not null, DraftRevisionId: not null } })
         {
@@ -104,18 +111,13 @@ public sealed partial class FileNode : INode
             createdRevisionId = new RevisionId(ex.Response.Conflict.DraftRevisionId);
         }
 
-        client.SecretsCache.Set(Node.GetNodeKeyCacheKey(parentNodeIdentity.VolumeId, createdNodeId), key.ToBytes());
-        client.SecretsCache.Set(Node.GetNameSessionKeyCacheKey(parentNodeIdentity.VolumeId, createdNodeId), nameSessionKey.Export().Token);
-        client.SecretsCache.Set(Node.GetPassphraseSessionKeyCacheKey(parentNodeIdentity.VolumeId, createdNodeId), passphraseSessionKey.Export().Token);
-        client.SecretsCache.Set(Node.GetContentKeyCacheKey(parentNodeIdentity.VolumeId, createdNodeId), contentKeyToken);
-
         var file = new FileNode
         {
             NodeIdentity = new NodeIdentity
             {
-                VolumeId = parentNodeIdentity.VolumeId,
+                VolumeId = parentFolderIdentity.VolumeId,
                 NodeId = createdNodeId,
-                ShareId = parentNodeIdentity.ShareId,
+                ShareId = parentFolderIdentity.ShareId,
             },
             ParentId = fileCreationRequest.ParentFolderIdentity.NodeId,
             Name = fileCreationRequest.Name,

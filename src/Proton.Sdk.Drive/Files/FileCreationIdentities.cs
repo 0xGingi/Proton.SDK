@@ -2,7 +2,7 @@
 
 namespace Proton.Sdk.Drive.Files;
 
-internal sealed record RevisionIdentity
+internal sealed class FileCreationIdentities
 {
     [JsonPropertyName("ID")]
     public required string LinkId { get; init; }

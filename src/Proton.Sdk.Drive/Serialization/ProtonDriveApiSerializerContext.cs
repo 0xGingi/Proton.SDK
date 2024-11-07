@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 using Proton.Sdk.Drive.Devices;
 using Proton.Sdk.Drive.Files;
 using Proton.Sdk.Drive.Folders;
@@ -27,7 +27,9 @@ namespace Proton.Sdk.Drive.Serialization;
 [JsonSerializable(typeof(FolderCreationParameters))]
 [JsonSerializable(typeof(FolderCreationResponse))]
 [JsonSerializable(typeof(FileCreationParameters))]
-[JsonSerializable(typeof(FileCreationApiResponse))]
+[JsonSerializable(typeof(Drive.Files.FileCreationResponse))]
+[JsonSerializable(typeof(RevisionCreationParameters))]
+[JsonSerializable(typeof(RevisionCreationResponse))]
 [JsonSerializable(typeof(RevisionConflictResponse))]
 [JsonSerializable(typeof(BlockUploadRequestParameters))]
 [JsonSerializable(typeof(BlockRequestResponse))]

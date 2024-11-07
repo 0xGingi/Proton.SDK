@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Security.Cryptography;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Drive.Files;
@@ -35,6 +35,7 @@ internal sealed class BlockUploader
         byte[] plainDataPrefix,
         int plainDataPrefixLength,
         Action<long> onProgress,
+        Action<int> releaseBlocksAction,
         CancellationToken cancellationToken)
     {
         try
@@ -115,8 +116,14 @@ internal sealed class BlockUploader
             }
             finally
             {
-                BlockSemaphore.Release();
-                _client.RevisionCreationSemaphore.Release(1);
+                try
+                {
+                    BlockSemaphore.Release();
+                }
+                finally
+                {
+                    releaseBlocksAction.Invoke(1);
+                }
             }
         }
         finally

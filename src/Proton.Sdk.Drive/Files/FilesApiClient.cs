@@ -1,4 +1,4 @@
-﻿using Proton.Sdk.Drive.Serialization;
+using Proton.Sdk.Drive.Serialization;
 using Proton.Sdk.Http;
 
 namespace Proton.Sdk.Drive.Files;
@@ -7,14 +7,27 @@ internal readonly struct FilesApiClient(HttpClient httpClient)
 {
     private readonly HttpClient _httpClient = httpClient;
 
-    public async Task<FileCreationApiResponse> CreateFileAsync(
+    public async Task<FileCreationResponse> CreateFileAsync(ShareId shareId, FileCreationParameters parameters, CancellationToken cancellationToken)
+    {
+        return await _httpClient
+            .Expecting(ProtonDriveApiSerializerContext.Default.FileCreationResponse, ProtonDriveApiSerializerContext.Default.RevisionConflictResponse)
+            .PostAsync($"shares/{shareId}/files", parameters, ProtonDriveApiSerializerContext.Default.FileCreationParameters, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<RevisionCreationResponse> CreateRevisionAsync(
         ShareId shareId,
-        FileCreationParameters parameters,
+        LinkId linkId,
+        RevisionCreationParameters parameters,
         CancellationToken cancellationToken)
     {
         return await _httpClient
-            .Expecting(ProtonDriveApiSerializerContext.Default.FileCreationApiResponse, ProtonDriveApiSerializerContext.Default.RevisionConflictResponse)
-            .PostAsync($"shares/{shareId}/files", parameters, ProtonDriveApiSerializerContext.Default.FileCreationParameters, cancellationToken)
+            .Expecting(ProtonDriveApiSerializerContext.Default.RevisionCreationResponse, ProtonDriveApiSerializerContext.Default.RevisionConflictResponse)
+            .PostAsync(
+                $"shares/{shareId}/files/{linkId}/revisions",
+                parameters,
+                ProtonDriveApiSerializerContext.Default.RevisionCreationParameters,
+                cancellationToken)
             .ConfigureAwait(false);
     }
 

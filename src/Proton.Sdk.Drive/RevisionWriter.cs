@@ -19,6 +19,7 @@ public sealed class RevisionWriter : IDisposable
     private readonly PgpPrivateKey _fileKey;
     private readonly PgpSessionKey _contentKey;
     private readonly PgpPrivateKey _signingKey;
+    private readonly Action<int> _releaseBlocksAction;
 
     private readonly int _targetBlockSize;
     private readonly int _maxBlockSize;
@@ -34,6 +35,7 @@ public sealed class RevisionWriter : IDisposable
         PgpPrivateKey fileKey,
         PgpSessionKey contentKey,
         PgpPrivateKey signingKey,
+        Action<int> releaseBlocksAction,
         int targetBlockSize = DefaultBlockSize,
         int maxBlockSize = DefaultBlockSize)
     {
@@ -44,6 +46,7 @@ public sealed class RevisionWriter : IDisposable
         _fileKey = fileKey;
         _contentKey = contentKey;
         _signingKey = signingKey;
+        _releaseBlocksAction = releaseBlocksAction;
         _targetBlockSize = targetBlockSize;
         _maxBlockSize = maxBlockSize;
     }
@@ -54,6 +57,7 @@ public sealed class RevisionWriter : IDisposable
         Stream contentInputStream,
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
+        Action<long> onProgress,
         CancellationToken cancellationToken)
     {
         var signinEmailAddress = _shareMetadata.MembershipEmailAddress;
@@ -66,6 +70,8 @@ public sealed class RevisionWriter : IDisposable
 
         ArraySegment<byte> manifestSignature;
         var blockSizes = new List<int>(8);
+
+        using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         await using (manifestStream.ConfigureAwait(false))
         {
@@ -118,6 +124,7 @@ public sealed class RevisionWriter : IDisposable
                                     _numberOfBytesUploaded += progress;
                                     ProgressUpdated?.Invoke(_numberOfBytesUploaded);
                                 },
+                                _releaseBlocksAction,
                                 cancellationToken);
 
                             uploadTasks.Enqueue(uploadTask);
@@ -142,16 +149,17 @@ public sealed class RevisionWriter : IDisposable
                     await AddNextBlockToManifestAsync(uploadTasks, manifestStream).ConfigureAwait(false);
                 }
             }
-            catch when (uploadTasks.Count > 0)
+            catch
             {
+                await cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+
                 try
                 {
                     await Task.WhenAll(uploadTasks).ConfigureAwait(false);
                 }
-                finally
+                catch
                 {
-                    _client.BlockUploader.BlockSemaphore.Release(uploadTasks.Count);
-                    _client.RevisionCreationSemaphore.Release(uploadTasks.Count);
+                    // Ignore exceptions because most if not all will just be cancellation-related, and we already have one to re-throw
                 }
 
                 throw;
