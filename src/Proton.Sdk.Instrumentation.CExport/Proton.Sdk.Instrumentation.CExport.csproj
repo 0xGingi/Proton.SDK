@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>libproton_instrumentation_sdk</AssemblyName>
+    <AssemblyName Condition="!$(RuntimeIdentifier.StartsWith('linux')) And !$(RuntimeIdentifier.StartsWith('android'))">proton_instrumentation_sdk</AssemblyName>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishAot>true</PublishAot>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="proton_drive_sdk" />
+    <InternalsVisibleTo Include="libproton_drive_sdk" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj" />
+    <ProjectReference Include="..\Proton.Sdk.Instrumentation\Proton.Sdk.Instrumentation.csproj" />
+  </ItemGroup>
+
+</Project>

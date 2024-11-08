@@ -3,7 +3,7 @@ using Proton.Sdk.Instrumentation.Extensions;
 
 namespace Proton.Sdk.Instrumentation.Observability;
 
-public sealed class ObservabilityService : IInstrumentFactory
+public sealed class ObservabilityService : IInstrumentFactory, IObservabilityService
 {
     private readonly ObservabilityApiClient _observabilityApiClient;
     private readonly TimeSpan _period;
@@ -43,7 +43,7 @@ public sealed class ObservabilityService : IInstrumentFactory
         _timer = new PeriodicTimer(_period);
     }
 
-    public async Task FlushAsync(CancellationToken cancellationToken)
+    public async ValueTask FlushAsync(CancellationToken cancellationToken)
     {
         await SendMetricsAsync(cancellationToken).ConfigureAwait(false);
     }

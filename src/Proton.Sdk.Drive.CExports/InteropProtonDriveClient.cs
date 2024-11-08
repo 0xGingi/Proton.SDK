@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Proton.Sdk.CExports;
+using Proton.Sdk.Instrumentation.CExport;
 
 namespace Proton.Sdk.Drive.CExports;
 
@@ -17,7 +18,7 @@ internal static class InteropProtonDriveClient
     }
 
     [UnmanagedCallersOnly(EntryPoint = "drive_client_create", CallConvs = [typeof(CallConvCdecl)])]
-    private static unsafe int NativeCreate(nint sessionHandle, nint* clientHandle)
+    private static unsafe int NativeCreate(nint sessionHandle, nint observabilityServiceHandle, nint* clientHandle)
     {
         try
         {
@@ -26,7 +27,12 @@ internal static class InteropProtonDriveClient
                 return -1;
             }
 
-            var client = new ProtonDriveClient(session);
+            if (!InteropProtonObservabilityService.TryGetFromHandle(observabilityServiceHandle, out var observabilityService))
+            {
+                return -1;
+            }
+
+            var client = new ProtonDriveClient(session, new ProtonDriveClientOptions { InstrumentFactory = observabilityService });
 
             *clientHandle = GCHandle.ToIntPtr(GCHandle.Alloc(client));
 

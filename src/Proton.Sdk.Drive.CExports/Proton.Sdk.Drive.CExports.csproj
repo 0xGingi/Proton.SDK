@@ -15,7 +15,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Drive\Proton.Sdk.Drive.csproj" />
+    <ProjectReference Include="..\Proton.Sdk.Instrumentation.CExport\Proton.Sdk.Instrumentation.CExport.csproj" />
     <IlcCompileInput Include="$(OutputPath)\proton_sdk.dll" />
+    <IlcCompileInput Include="$(OutputPath)\proton_instrumentation_sdk.dll" />
     <DirectPInvoke Include="proton_crypto" />
     <NativeLibrary Include="../../build/output/crypto_static/proton_crypto.a" />
   </ItemGroup>

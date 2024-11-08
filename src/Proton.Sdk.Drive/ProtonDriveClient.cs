@@ -9,23 +9,26 @@ using Proton.Sdk.Drive.Shares;
 using Proton.Sdk.Drive.Storage;
 using Proton.Sdk.Drive.Verification;
 using Proton.Sdk.Drive.Volumes;
+using Proton.Sdk.Instrumentation;
 
 namespace Proton.Sdk.Drive;
 
 public sealed class ProtonDriveClient
 {
+    private readonly IInstrumentFactory? _instrumentFactory;
     private readonly HttpClient _httpClient;
 
     /// <summary>
     /// Creates a new instance of <see cref="ProtonDriveClient"/>.
     /// </summary>
-    /// <param name="session">Authentication session</param>
-    /// <param name="clientId">Unique identifier for this client used to identify draft revisions that it may re-use.</param>
-    public ProtonDriveClient(ProtonApiSession session, string? clientId = default)
+    /// <param name="session">Authentication session.</param>
+    /// <param name="options">Specifies options for <see cref="ProtonDriveClient" /></param>
+    public ProtonDriveClient(ProtonApiSession session, in ProtonDriveClientOptions options = default)
     {
+        _instrumentFactory = options.InstrumentFactory;
         _httpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute);
 
-        ClientId = clientId ?? Guid.NewGuid().ToString();
+        ClientId = options.ClientId ?? Guid.NewGuid().ToString();
 
         Account = new ProtonAccountClient(session);
         SecretsCache = session.SecretsCache;
