@@ -5,38 +5,39 @@ option csharp_namespace = "Proton.Sdk.Drive";
 import "proton_types.proto";
 
 enum DevicePlatform {
-    DEVICE_PLATFORM_UNKNOWN_ = 0;
+    DEVICE_PLATFORM_INVALID = 0;
     DEVICE_PLATFORM_WINDOWS = 1;
     DEVICE_PLATFORM_MACOS = 2;
 }
 
 enum FileSampleType {
-    FILE_SAMPLE_TYPE_THUMBNAIL = 0;
-    FILE_SAMPLE_TYPE_PREVIEW = 1;
+    FILE_SAMPLE_TYPE_INVALID = 0;
+    FILE_SAMPLE_TYPE_THUMBNAIL = 1;
+    FILE_SAMPLE_TYPE_PREVIEW = 2;
 }
 
 enum MemberPermissions {
-    MEMBER_PERMISSIONS_UNKNOWN = 0;
+    MEMBER_PERMISSIONS_INVALID = 0;
     MEMBER_PERMISSIONS_WRITE = 2;
     MEMBER_PERMISSIONS_READ = 4;
     MEMBER_PERMISSIONS_ADMIN = 16;
 }
 
 enum MemberState {
-    MEMBER_STATE_UNKNOWN = 0;
+    MEMBER_STATE_INVALID = 0;
     MEMBER_STATE_ACTIVE = 1;
     MEMBER_STATE_LOCKED = 2;
 }
 
 enum ShareState {
-    SHARE_STATE_UNKNOWN = 0;
+    SHARE_STATE_INVALID = 0;
     SHARE_STATE_ACTIVE = 1;
-    SHARE_STATE_DELETED_ = 2;
+    SHARE_STATE_DELETED = 2;
     SHARE_STATE_RESTORED = 3;
 }
 
 enum ShareType {
-    SHARE_TYPE_UNKNOWN = 0;
+    SHARE_TYPE_INVALID = 0;
     SHARE_TYPE_MAIN = 1;
     SHARE_TYPE_STANDARD = 2;
     SHARE_TYPE_DEVICE = 3;
@@ -93,7 +94,7 @@ message NodeIdentity {
 }
 
 enum NodeState {
-    NODE_STATE_DRAFT_ = 0;
+    NODE_STATE_DRAFT = 0;
     NODE_STATE_ACTIVE = 1;
     NODE_STATE_TRASHED = 2;
 }

@@ -109,7 +109,7 @@ internal sealed class BlockUploader
 
                     await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
 
-                    onBlockProgress?.Invoke(dataPacketStream.Position);
+                    onBlockProgress.Invoke(dataPacketStream.Position);
 
                     return sha256Digest;
                 }

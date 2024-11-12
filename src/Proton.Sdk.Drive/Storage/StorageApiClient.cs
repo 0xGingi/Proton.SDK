@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Mime;
+using Proton.Sdk.Drive.IO;
 using Proton.Sdk.Drive.Serialization;
 using Proton.Sdk.Http;
 using Proton.Sdk.Serialization;
@@ -12,7 +13,7 @@ internal readonly struct StorageApiClient(HttpClient httpClient)
 
     public async Task<ApiResponse> UploadBlobAsync(string url, Stream dataPacketStream, CancellationToken cancellationToken)
     {
-        using var blobContent = new StreamContent(dataPacketStream);
+        using var blobContent = new StreamContent(new NonDisposingStreamWrapper(dataPacketStream));
         blobContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data") { Name = "Block", FileName = "blob" };
         blobContent.Headers.ContentType = new MediaTypeHeaderValue(MediaTypeNames.Application.Octet);
 
