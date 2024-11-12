@@ -53,7 +53,7 @@ internal static class InteropNode
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-9, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -9);
         }
     }
 }

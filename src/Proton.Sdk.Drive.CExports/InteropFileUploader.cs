@@ -35,7 +35,7 @@ internal static class InteropFileUploader
     }
 
     [UnmanagedCallersOnly(EntryPoint = "uploader_upload_file", CallConvs = [typeof(CallConvCdecl)])]
-    private static int NativeUploadFile(nint uploaderHandle, InteropArray fileUploadRequestBytes, InteropAsyncCallback/*WithProgress*/ callback)
+    private static int NativeUploadFile(nint uploaderHandle, InteropArray fileUploadRequestBytes, InteropAsyncCallbackWithProgress callback)
     {
         try
         {
@@ -44,7 +44,7 @@ internal static class InteropFileUploader
                 return -1;
             }
 
-            return callback.InvokeFor(ct => InteropUploadFileAsync(uploader, fileUploadRequestBytes, callback, ct));
+            return callback.AsyncCallback.InvokeFor(ct => InteropUploadFileAsync(uploader, fileUploadRequestBytes, callback.ProgressCallback, ct));
         }
         catch
         {
@@ -53,7 +53,7 @@ internal static class InteropFileUploader
     }
 
     [UnmanagedCallersOnly(EntryPoint = "uploader_upload_revision", CallConvs = [typeof(CallConvCdecl)])]
-    private static int NativeUploadRevision(nint uploaderHandle, InteropArray revisionUploadRequestBytes, InteropAsyncCallback/*WithProgress*/ callback)
+    private static int NativeUploadRevision(nint uploaderHandle, InteropArray revisionUploadRequestBytes, InteropAsyncCallbackWithProgress callback)
     {
         try
         {
@@ -62,7 +62,7 @@ internal static class InteropFileUploader
                 return -1;
             }
 
-            return callback.InvokeFor(ct => InteropUploadRevisionAsync(uploader, revisionUploadRequestBytes, callback, ct));
+            return callback.AsyncCallback.InvokeFor(ct => InteropUploadRevisionAsync(uploader, revisionUploadRequestBytes, callback.ProgressCallback, ct));
         }
         catch
         {
@@ -113,15 +113,16 @@ internal static class InteropFileUploader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-6, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -6);
         }
     }
 
-    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadFileAsync(FileUploader uploader, InteropArray fileUploadRequestBytes, InteropAsyncCallback/*WithProgress*/ callback, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadFileAsync(FileUploader uploader, InteropArray fileUploadRequestBytes, InteropProgressCallback progressCallback, CancellationToken cancellationToken)
     {
         try
         {
             var fileUploadRequest = FileUploadRequest.Parser.ParseFrom(fileUploadRequestBytes.ToArray());
+            var fileStream = File.OpenRead(fileUploadRequest.TargetFilePath);
             var samples = fileUploadRequest.Samples.ToList().Select(fs => new FileSample(fs.Type, new ArraySegment<byte>(fs.Content.ToByteArray())));
 
             var response = await uploader.UploadNewFileAsync(
@@ -129,43 +130,43 @@ internal static class InteropFileUploader
                 fileUploadRequest.ParentFolderIdentity,
                 fileUploadRequest.Name,
                 fileUploadRequest.MimeType,
-                new MemoryStream(), //contentInputStream,
+                fileStream,
                 samples,
                 DateTimeOffset.FromUnixTimeSeconds(fileUploadRequest.LastModificationDate),
-                (completed, total) => { },
+                (completed, total) => progressCallback.UpdateProgress(completed, total),
                 cancellationToken).ConfigureAwait(false);
 
             return ResultExtensions.Success(response);
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-7, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -7);
         }
     }
 
-    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadRevisionAsync(FileUploader uploader, InteropArray revisionUploadRequestBytes, InteropAsyncCallback/*WithProgress*/ callback, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadRevisionAsync(FileUploader uploader, InteropArray revisionUploadRequestBytes, InteropProgressCallback progressCallback, CancellationToken cancellationToken)
     {
         try
         {
             var revisionUploadRequest = RevisionUploadRequest.Parser.ParseFrom(revisionUploadRequestBytes.ToArray());
+            var fileStream = File.OpenRead(revisionUploadRequest.TargetFilePath);
             var samples = revisionUploadRequest.Samples.ToList().Select(fs => new FileSample(fs.Type, new ArraySegment<byte>(fs.Content.ToByteArray())));
 
             var response = await uploader.UploadNewRevisionAsync(
                 revisionUploadRequest.ShareMetadata,
                 revisionUploadRequest.FileIdentity,
                 revisionUploadRequest.RevisionMetadata.RevisionId,
-                new MemoryStream(),
-                // revisionUploadRequest.Stream contentInputStream,
+                fileStream,
                 samples,
                 DateTimeOffset.FromUnixTimeSeconds(revisionUploadRequest.LastModificationDate),
-                (completed, total) => { },
+                (completed, total) => progressCallback.UpdateProgress(completed, total),
                 cancellationToken).ConfigureAwait(false);
 
             return ResultExtensions.Success(response);
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-8, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -8);
         }
     }
 }

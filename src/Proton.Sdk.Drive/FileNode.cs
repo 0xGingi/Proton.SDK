@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Google.Protobuf;
+using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Files;
@@ -195,7 +196,7 @@ public sealed partial class FileNode : INode
                 (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
                 out nameKey))
             {
-                throw new ProtonApiException($"Could not get content key for {nodeIdentity.NodeId}");
+                throw new ProtonApiException($"Could not get content key for nodeId {nodeIdentity.NodeId} shareId {nodeIdentity.ShareId} volumeId {nodeIdentity.VolumeId}");
             }
         }
 

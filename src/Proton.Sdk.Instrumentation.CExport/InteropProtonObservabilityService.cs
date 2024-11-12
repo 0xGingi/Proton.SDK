@@ -109,7 +109,7 @@ internal static class InteropProtonObservabilityService
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-1, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -1);
         }
     }
 }

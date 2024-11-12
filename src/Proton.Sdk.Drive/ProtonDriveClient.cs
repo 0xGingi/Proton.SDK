@@ -63,7 +63,7 @@ public sealed class ProtonDriveClient
     internal BlockDownloader BlockDownloader { get; }
     internal FifoFlexibleSemaphore RevisionBlockListingSemaphore { get; }
     internal FifoFlexibleSemaphore RevisionCreationSemaphore { get; }
-    private ILogger<ProtonDriveClient> Logger { get; }
+    internal ILogger<ProtonDriveClient> Logger { get; }
 
     public Task<Volume[]> GetVolumesAsync(CancellationToken cancellationToken)
     {

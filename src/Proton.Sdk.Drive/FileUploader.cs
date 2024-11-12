@@ -59,7 +59,7 @@ public sealed class FileUploader : IDisposable
         return fileUploadResponse.File;
     }
 
-    public async Task<FileNode> UploadNewFileAsync(
+    public async Task<FileUploadResponse> UploadNewFileAsync(
         ShareMetadata shareMetadata,
         NodeIdentity parentFolderIdentity,
         string name,
@@ -81,9 +81,13 @@ public sealed class FileUploader : IDisposable
         };
         var fileCreationResponse = await FileNode.CreateFileAsync(_client, fileCreationRequest, cancellationToken).ConfigureAwait(false);
 
-        await UploadAsync(shareMetadata, parentFolderIdentity, fileCreationResponse.Revision, contentInputStream, samples, lastModificationTime, onProgress, cancellationToken).ConfigureAwait(false);
+        await UploadAsync(shareMetadata, fileCreationResponse.File.NodeIdentity, fileCreationResponse.Revision, contentInputStream, samples, lastModificationTime, onProgress, cancellationToken).ConfigureAwait(false);
 
-        return fileCreationResponse.File;
+        return new FileUploadResponse
+        {
+            File = fileCreationResponse.File,
+            Revision = fileCreationResponse.Revision
+        };
     }
 
     public async Task<Revision> UploadNewRevisionAsync(

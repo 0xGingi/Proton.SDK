@@ -17,7 +17,7 @@ internal static class InteropFileDownloader
     }
 
     [UnmanagedCallersOnly(EntryPoint = "downloader_create", CallConvs = [typeof(CallConvCdecl)])]
-    private static int NativeRead(nint clientHandle, InteropAsyncCallback callback)
+    private static int NativeRead(nint clientHandle, InteropArray emptyRequest, InteropAsyncCallback callback)
     {
         try
         {
@@ -35,7 +35,7 @@ internal static class InteropFileDownloader
     }
 
     [UnmanagedCallersOnly(EntryPoint = "downloader_download_file", CallConvs = [typeof(CallConvCdecl)])]
-    private static int NativeDownloadFile(nint downloaderHandle, InteropArray fileDownloadRequestBytes, InteropAsyncCallback callback)
+    private static int NativeDownloadFile(nint downloaderHandle, InteropArray fileDownloadRequestBytes, InteropAsyncCallbackWithProgress callback)
     {
         try
         {
@@ -44,7 +44,7 @@ internal static class InteropFileDownloader
                 return -1;
             }
 
-            return callback.InvokeFor(ct => InteropDownloadFileAsync(downloader, fileDownloadRequestBytes, ct));
+            return callback.AsyncCallback.InvokeFor(ct => InteropDownloadFileAsync(downloader, fileDownloadRequestBytes, callback.ProgressCallback, ct));
         }
         catch
         {
@@ -85,11 +85,11 @@ internal static class InteropFileDownloader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-3, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -3);
         }
     }
 
-    private static async ValueTask<Result<InteropArray, InteropArray>> InteropDownloadFileAsync(FileDownloader downloader, InteropArray fileDownloadRequestBytes, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropDownloadFileAsync(FileDownloader downloader, InteropArray fileDownloadRequestBytes, InteropProgressCallback progressCallback, CancellationToken cancellationToken)
     {
         try
         {
@@ -99,14 +99,14 @@ internal static class InteropFileDownloader
                 fileDownloadRequest.FileIdentity,
                 fileDownloadRequest.RevisionMetadata,
                 fileDownloadRequest.TargetFilePath,
-                (completed, total) => { },
+                (completed, total) => progressCallback.UpdateProgress(completed, total),
                 cancellationToken).ConfigureAwait(false);
 
             return ResultExtensions.Success(new IntResponse { Value = 0 });
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-4, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -4);
         }
     }
 }

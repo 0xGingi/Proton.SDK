@@ -39,7 +39,7 @@ public sealed class FileDownloader
         {
             using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken).ConfigureAwait(false);
 
-            var fileStream = File.Open(targetFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var fileStream = File.Open(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
 
             return await revisionReader.ReadAsync(fileStream, onProgress, cancellationToken).ConfigureAwait(false);
         }

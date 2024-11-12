@@ -169,7 +169,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-1, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -1);
         }
     }
 
@@ -183,7 +183,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(-2, e.Message);
+            return ResultExtensions.Failure(e, defaultCode: -2);
         }
     }
 }
