@@ -163,14 +163,13 @@ message FileUploaderCreationRequest {
     int32 number_of_samples = 2;
 }
 
-
 message FileUploadRequest {
     ShareMetadata share_metadata = 1;
     NodeIdentity parent_folder_identity = 2;
     string name = 3;
     string mimeType = 4;
-    string target_file_path = 5;
-    repeated FileSampleProto samples = 6;
+    string source_file_path = 5;
+    optional bytes thumbnail = 6;
     int64 last_modification_date = 7;
 }
 
@@ -184,19 +183,14 @@ message RevisionUploadRequest {
     NodeIdentity file_identity = 1;
     ShareMetadata share_metadata = 2;
     RevisionMetadata revision_metadata = 3;
-    repeated FileSampleProto samples = 4; // Was: optional bytes
+    optional bytes thumbnail = 4;
     int64 last_modification_date = 5;
-    string target_file_path = 6; // Do we need this?
+    string source_file_path = 6; // Do we need this?
 }
 
 message ProgressUpdate {
     int64 bytes_completed = 1;
     int64 bytes_in_total = 2;
-}
-
-message FileSampleProto {
-    FileSampleType type = 1;
-    bytes content = 2;
 }
 
 // Mark: - Other operations

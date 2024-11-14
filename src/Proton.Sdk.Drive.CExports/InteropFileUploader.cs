@@ -106,9 +106,12 @@ internal static class InteropFileUploader
         {
             var fileUploaderCreationRequest = FileUploaderCreationRequest.Parser.ParseFrom(fileUploaderCreationRequestBytes.AsReadOnlySpan());
 
-            var uploader = await client.WaitForFileUploaderAsync(fileUploaderCreationRequest.FileSize, fileUploaderCreationRequest.NumberOfSamples, cancellationToken).ConfigureAwait(false);
+            var uploader = await client.WaitForFileUploaderAsync(
+                fileUploaderCreationRequest.FileSize,
+                fileUploaderCreationRequest.NumberOfSamples,
+                cancellationToken).ConfigureAwait(false);
 
-            nint handle = GCHandle.ToIntPtr(GCHandle.Alloc(uploader));
+            var handle = GCHandle.ToIntPtr(GCHandle.Alloc(uploader));
             return ResultExtensions.Success(new IntResponse { Value = handle });
         }
         catch (Exception e)
@@ -117,26 +120,37 @@ internal static class InteropFileUploader
         }
     }
 
-    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadFileAsync(FileUploader uploader, InteropArray fileUploadRequestBytes, InteropProgressCallback progressCallback, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadFileAsync(
+        FileUploader uploader,
+        InteropArray fileUploadRequestBytes,
+        InteropProgressCallback progressCallback,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var fileUploadRequest = FileUploadRequest.Parser.ParseFrom(fileUploadRequestBytes.ToArray());
-            var fileStream = File.OpenRead(fileUploadRequest.TargetFilePath);
-            var samples = fileUploadRequest.Samples.ToList().Select(fs => new FileSample(fs.Type, new ArraySegment<byte>(fs.Content.ToByteArray())));
+            var fileUploadRequest = FileUploadRequest.Parser.ParseFrom(fileUploadRequestBytes.AsReadOnlySpan());
 
-            var response = await uploader.UploadNewFileAsync(
-                fileUploadRequest.ShareMetadata,
-                fileUploadRequest.ParentFolderIdentity,
-                fileUploadRequest.Name,
-                fileUploadRequest.MimeType,
-                fileStream,
-                samples,
-                DateTimeOffset.FromUnixTimeSeconds(fileUploadRequest.LastModificationDate),
-                (completed, total) => progressCallback.UpdateProgress(completed, total),
-                cancellationToken).ConfigureAwait(false);
+            var samples = fileUploadRequest.HasThumbnail
+                ? new[] { new FileSample(FileSampleType.Thumbnail, new ArraySegment<byte>(fileUploadRequest.Thumbnail.ToByteArray())) }
+                : [];
 
-            return ResultExtensions.Success(response);
+            var fileStream = File.OpenRead(fileUploadRequest.SourceFilePath);
+
+            await using (fileStream)
+            {
+                var response = await uploader.UploadNewFileAsync(
+                    fileUploadRequest.ShareMetadata,
+                    fileUploadRequest.ParentFolderIdentity,
+                    fileUploadRequest.Name,
+                    fileUploadRequest.MimeType,
+                    fileStream,
+                    samples,
+                    DateTimeOffset.FromUnixTimeSeconds(fileUploadRequest.LastModificationDate),
+                    (completed, total) => progressCallback.UpdateProgress(completed, total),
+                    cancellationToken).ConfigureAwait(false);
+
+                return ResultExtensions.Success(response);
+            }
         }
         catch (Exception e)
         {
@@ -144,25 +158,36 @@ internal static class InteropFileUploader
         }
     }
 
-    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadRevisionAsync(FileUploader uploader, InteropArray revisionUploadRequestBytes, InteropProgressCallback progressCallback, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadRevisionAsync(
+        FileUploader uploader,
+        InteropArray revisionUploadRequestBytes,
+        InteropProgressCallback progressCallback,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var revisionUploadRequest = RevisionUploadRequest.Parser.ParseFrom(revisionUploadRequestBytes.ToArray());
-            var fileStream = File.OpenRead(revisionUploadRequest.TargetFilePath);
-            var samples = revisionUploadRequest.Samples.ToList().Select(fs => new FileSample(fs.Type, new ArraySegment<byte>(fs.Content.ToByteArray())));
+            var revisionUploadRequest = RevisionUploadRequest.Parser.ParseFrom(revisionUploadRequestBytes.AsReadOnlySpan());
 
-            var response = await uploader.UploadNewRevisionAsync(
-                revisionUploadRequest.ShareMetadata,
-                revisionUploadRequest.FileIdentity,
-                revisionUploadRequest.RevisionMetadata.RevisionId,
-                fileStream,
-                samples,
-                DateTimeOffset.FromUnixTimeSeconds(revisionUploadRequest.LastModificationDate),
-                (completed, total) => progressCallback.UpdateProgress(completed, total),
-                cancellationToken).ConfigureAwait(false);
+            var samples = revisionUploadRequest.HasThumbnail
+                ? new[] { new FileSample(FileSampleType.Thumbnail, new ArraySegment<byte>(revisionUploadRequest.Thumbnail.ToByteArray())) }
+                : [];
 
-            return ResultExtensions.Success(response);
+            var fileStream = File.OpenRead(revisionUploadRequest.SourceFilePath);
+
+            await using (fileStream)
+            {
+                var response = await uploader.UploadNewRevisionAsync(
+                    revisionUploadRequest.ShareMetadata,
+                    revisionUploadRequest.FileIdentity,
+                    revisionUploadRequest.RevisionMetadata.RevisionId,
+                    fileStream,
+                    samples,
+                    DateTimeOffset.FromUnixTimeSeconds(revisionUploadRequest.LastModificationDate),
+                    (completed, total) => progressCallback.UpdateProgress(completed, total),
+                    cancellationToken).ConfigureAwait(false);
+
+                return ResultExtensions.Success(response);
+            }
         }
         catch (Exception e)
         {

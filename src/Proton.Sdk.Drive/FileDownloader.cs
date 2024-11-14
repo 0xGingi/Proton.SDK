@@ -41,7 +41,10 @@ public sealed class FileDownloader
 
             var fileStream = File.Open(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
 
-            return await revisionReader.ReadAsync(fileStream, onProgress, cancellationToken).ConfigureAwait(false);
+            await using (fileStream.ConfigureAwait(false))
+            {
+                return await revisionReader.ReadAsync(fileStream, onProgress, cancellationToken).ConfigureAwait(false);
+            }
         }
         finally
         {

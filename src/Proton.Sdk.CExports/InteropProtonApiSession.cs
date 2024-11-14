@@ -111,8 +111,7 @@ internal static class InteropProtonApiSession
         using var userKey = PgpPrivateKey.ImportAndUnlock(
             armoredUserKey.ArmoredKeyData.ToByteArray(),
             Encoding.UTF8.GetBytes(armoredUserKey.Passphrase),
-            PgpEncoding.AsciiArmor
-        );
+            PgpEncoding.AsciiArmor);
 
         session.AddUserKey(session.UserId, new UserKeyId(armoredUserKey.KeyId), userKey.ToBytes());
 
@@ -129,7 +128,7 @@ internal static class InteropProtonApiSession
                 return -1;
             }
 
-            callback.InvokeFor(ct => InteropEndAsync(session));
+            callback.InvokeFor(_ => InteropEndAsync(session));
 
             return 0;
         }
@@ -164,7 +163,7 @@ internal static class InteropProtonApiSession
 
             var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken).ConfigureAwait(false);
 
-            nint handle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
+            var handle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
             return ResultExtensions.Success(new IntResponse { Value = handle });
         }
         catch (Exception e)

@@ -80,7 +80,7 @@ internal static class InteropFileDownloader
         {
             var downloader = await client.WaitForFileDownloaderAsync(cancellationToken).ConfigureAwait(false);
 
-            nint handle = GCHandle.ToIntPtr(GCHandle.Alloc(downloader));
+            var handle = GCHandle.ToIntPtr(GCHandle.Alloc(downloader));
             return ResultExtensions.Success(new IntResponse { Value = handle });
         }
         catch (Exception e)
@@ -93,7 +93,7 @@ internal static class InteropFileDownloader
     {
         try
         {
-            var fileDownloadRequest = FileDownloadRequest.Parser.ParseFrom(fileDownloadRequestBytes.ToArray());
+            var fileDownloadRequest = FileDownloadRequest.Parser.ParseFrom(fileDownloadRequestBytes.AsReadOnlySpan());
 
             var response = await downloader.DownloadAsync(
                 fileDownloadRequest.FileIdentity,
