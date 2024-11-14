@@ -42,6 +42,13 @@ public struct ResultExtensions
     private static Result<InteropArray, InteropArray> Failure(int code, string message)
     {
         return new Result<InteropArray, InteropArray>(
-            error: InteropArray.FromMemory(new ErrorResponse { Code = code, Message = message }.ToByteArray()));
+            error: InteropArray.FromMemory(new Error { PrimaryCode = code, Message = message }.ToByteArray()));
+    }
+
+    internal static Result<InteropArray, InteropArray> Failure(Exception exception)
+    {
+        var error = exception.ToInteropError();
+
+        return new Result<InteropArray, InteropArray>(error: InteropArray.FromMemory(error.ToByteArray()));
     }
 }

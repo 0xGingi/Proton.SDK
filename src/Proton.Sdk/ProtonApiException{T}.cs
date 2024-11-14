@@ -1,4 +1,6 @@
-﻿namespace Proton.Sdk;
+﻿using System.Net;
+
+namespace Proton.Sdk;
 
 internal sealed class ProtonApiException<T> : ProtonApiException
     where T : ApiResponse
@@ -17,8 +19,8 @@ internal sealed class ProtonApiException<T> : ProtonApiException
     {
     }
 
-    public ProtonApiException(T response)
-        : base(response)
+    public ProtonApiException(HttpStatusCode statusCode, T response)
+        : base(statusCode, response)
     {
         Response = response;
     }

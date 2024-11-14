@@ -21,7 +21,7 @@ internal static class HttpResponseMessageExtensions
                     var response = await responseMessage.Content.ReadFromJsonAsync(failureTypeInfo, cancellationToken)
                         .ConfigureAwait(false) ?? throw new JsonException();
 
-                    throw new ProtonApiException<TFailure>(response);
+                    throw new ProtonApiException<TFailure>(responseMessage.StatusCode, response);
                 }
 
             case HttpStatusCode.BadRequest or HttpStatusCode.TooManyRequests:
@@ -29,7 +29,7 @@ internal static class HttpResponseMessageExtensions
                     var response = await responseMessage.Content.ReadFromJsonAsync(ProtonCoreApiSerializerContext.Default.ApiResponse, cancellationToken)
                         .ConfigureAwait(false) ?? throw new JsonException();
 
-                    throw new ProtonApiException(response);
+                    throw new ProtonApiException(responseMessage.StatusCode, response);
                 }
 
             default:

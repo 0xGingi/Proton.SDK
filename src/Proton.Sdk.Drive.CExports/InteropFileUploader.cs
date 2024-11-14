@@ -116,7 +116,7 @@ internal static class InteropFileUploader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e, defaultCode: -6);
+            return ResultExtensions.Failure(e);
         }
     }
 
@@ -154,7 +154,7 @@ internal static class InteropFileUploader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e, defaultCode: -7);
+            return ResultExtensions.Failure(e);
         }
     }
 
@@ -191,7 +191,7 @@ internal static class InteropFileUploader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e, defaultCode: -8);
+            return ResultExtensions.Failure(e);
         }
     }
 }

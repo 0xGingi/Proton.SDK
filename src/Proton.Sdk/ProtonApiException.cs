@@ -1,4 +1,6 @@
-﻿namespace Proton.Sdk;
+﻿using System.Net;
+
+namespace Proton.Sdk;
 
 public class ProtonApiException : Exception
 {
@@ -16,11 +18,13 @@ public class ProtonApiException : Exception
     {
     }
 
-    internal ProtonApiException(ApiResponse response)
+    internal ProtonApiException(HttpStatusCode statusCode, ApiResponse response)
         : this($"{response.Code}: {response.ErrorMessage}")
     {
         Code = response.Code;
+        TransportCode = (int)statusCode;
     }
 
     public ResponseCode Code { get; }
+    public int TransportCode { get; }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using Polly;
 using Proton.Sdk.Authentication;
 using Proton.Sdk.Http;
@@ -44,12 +45,13 @@ internal static class ProtonClientConfigurationExtensions
                 builder.AddStandardResilienceHandler(
                     options =>
                     {
+                        options.TotalRequestTimeout = new HttpTimeoutStrategyOptions { Timeout = TimeSpan.FromMinutes(1) };
                         options.Retry.ShouldRetryAfterHeader = true;
-                        options.Retry.Delay = TimeSpan.FromSeconds(10);
+                        options.Retry.Delay = TimeSpan.FromSeconds(2.5);
                         options.Retry.BackoffType = DelayBackoffType.Exponential;
                         options.Retry.UseJitter = true;
                         options.Retry.MaxRetryAttempts = 4;
-                        options.CircuitBreaker.FailureRatio = 0.8;
+                        options.CircuitBreaker.FailureRatio = 0.5;
                     });
 
                 if (session is not null)

@@ -85,7 +85,7 @@ internal static class InteropFileDownloader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e, defaultCode: -3);
+            return ResultExtensions.Failure(e);
         }
     }
 
@@ -106,7 +106,7 @@ internal static class InteropFileDownloader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e, defaultCode: -4);
+            return ResultExtensions.Failure(e);
         }
     }
 }

@@ -93,7 +93,7 @@ internal static class InteropProtonApiSession
             return -1;
         }
 
-        session.AddUserKey(session.UserId, new UserKeyId(userKey.KeyId), userKey.KeyData.ToByteArray()); // AsReadOnlySpan
+        session.AddUserKey(session.UserId, new UserKeyId(userKey.KeyId), userKey.KeyData.Span);
 
         return 0;
     }
@@ -168,7 +168,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e, defaultCode: -1);
+            return ResultExtensions.Failure(e);
         }
     }
 
@@ -182,7 +182,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e, defaultCode: -2);
+            return ResultExtensions.Failure(e);
         }
     }
 }

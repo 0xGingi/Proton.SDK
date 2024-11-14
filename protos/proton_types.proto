@@ -100,9 +100,24 @@ message LogEvent {
 
 // Mark: - Responses
 
-message ErrorResponse {
-    int32 code = 1;
+enum ErrorDomain {
+    Undefined = 0;
+    SuccessfulCancellation = 1;
+    Api = 2;
+    Network = 3;
+    Transport = 4;
+    Serialization = 5;
+    Cryptography = 6;
+}
+
+message Error {
+    string type = 1;
     string message = 2;
+    ErrorDomain domain = 3;
+    optional int64 primary_code = 4;
+    optional int64 secondary_code = 5;
+    optional string context = 6;
+    optional Error inner_error = 7;
 }
 
 message StringResponse {
