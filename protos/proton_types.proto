@@ -98,6 +98,37 @@ message LogEvent {
     string category_name = 3;
 }
 
+// Response body passing
+
+enum OperationType {
+    OPERATION_TYPE_INVALID = 0;
+    OPERATION_TYPE_DOWNLOAD = 1;
+    OPERATION_TYPE_FILE_UPLOAD = 2;
+    OPERATION_TYPE_REVISION_UPLOAD = 3;
+}
+
+message OperationIdentifier {
+    OperationType type = 1;
+    string identifier = 2;
+    string timestamp = 3;
+}
+
+enum RequestMethod {
+    REQUEST_METHOD_INVALID = 0;
+    REQUEST_METHOD_GET = 1;
+    REQUEST_METHOD_POST = 2;
+    REQUEST_METHOD_PUT = 3;
+    REQUEST_METHOD_DELETE = 4;
+}
+
+message RequestResponseBodyResponse {
+    OperationIdentifier operationId = 1;
+    RequestMethod method = 2;
+    string url = 3;
+    string requestBody = 4;
+    string responseBody = 5;
+}
+
 // Mark: - Responses
 
 enum ErrorDomain {

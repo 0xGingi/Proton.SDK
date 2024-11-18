@@ -33,11 +33,12 @@ public sealed class FileDownloader
         IRevisionForTransfer revision,
         string targetFilePath,
         Action<long, long> onProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         try
         {
-            using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken).ConfigureAwait(false);
+            using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken, operationId).ConfigureAwait(false);
 
             var fileStream = File.Open(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
 

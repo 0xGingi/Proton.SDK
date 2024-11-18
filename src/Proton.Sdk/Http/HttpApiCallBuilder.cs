@@ -18,9 +18,15 @@ internal readonly struct HttpApiCallBuilder<TSuccess, TFailure>
         _failureTypeInfo = failureTypeInfo;
     }
 
-    public async ValueTask<TSuccess> GetAsync(string requestUri, CancellationToken cancellationToken)
+    public async ValueTask<TSuccess> GetAsync(string requestUri, CancellationToken cancellationToken, byte[]? operationId = null)
     {
         using var requestMessage = HttpRequestMessageFactory.Create(HttpMethod.Get, requestUri);
+
+        if (operationId is not null)
+        {
+            requestMessage.Options.Set(new HttpRequestOptionsKey<byte[]>("ShouldBePassedWithOperationId"), operationId);
+        }
+
         return await SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
     }
 
@@ -34,9 +40,16 @@ internal readonly struct HttpApiCallBuilder<TSuccess, TFailure>
         string requestUri,
         TRequestBody body,
         JsonTypeInfo<TRequestBody> bodyTypeInfo,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         using var requestMessage = HttpRequestMessageFactory.Create(HttpMethod.Post, requestUri, body, bodyTypeInfo);
+
+        if (operationId is not null)
+        {
+            requestMessage.Options.Set(new HttpRequestOptionsKey<byte[]>("ShouldBePassedWithOperationId"), operationId);
+        }
+
         return await SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
     }
 
@@ -62,9 +75,16 @@ internal readonly struct HttpApiCallBuilder<TSuccess, TFailure>
         string requestUri,
         TRequestBody body,
         JsonTypeInfo<TRequestBody> bodyTypeInfo,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         using var requestMessage = HttpRequestMessageFactory.Create(HttpMethod.Put, requestUri, body, bodyTypeInfo);
+
+        if (operationId is not null)
+        {
+            requestMessage.Options.Set(new HttpRequestOptionsKey<byte[]>("ShouldBePassedWithOperationId"), operationId);
+        }
+
         return await SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
     }
 

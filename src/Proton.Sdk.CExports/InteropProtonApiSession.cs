@@ -21,11 +21,12 @@ internal static class InteropProtonApiSession
     private static int NativeBegin(
         nint unused,
         InteropArray sessionBeginRequestBytes,
+        InteropRequestResponseBodyCallback requestResponseBodyCallback,
         InteropAsyncCallback callback)
     {
         try
         {
-            return callback.InvokeFor(ct => InteropBeginAsync(sessionBeginRequestBytes, ct));
+            return callback.InvokeFor(ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, ct));
         }
         catch
         {
@@ -36,11 +37,14 @@ internal static class InteropProtonApiSession
     [UnmanagedCallersOnly(EntryPoint = "session_resume", CallConvs = [typeof(CallConvCdecl)])]
     private static unsafe int NativeResume(
         InteropArray sessionResumeRequestBytes,
+        InteropRequestResponseBodyCallback requestResponseBodyCallback,
         nint* sessionHandle)
     {
         try
         {
             var sessionResumeRequest = SessionResumeRequest.Parser.ParseFrom(sessionResumeRequestBytes.AsReadOnlySpan());
+            sessionResumeRequest.Options.CustomHttpMessageHandlerFactory = () =>
+                new ResponsePassingHttpHandler((operationId, method, url, requestBody, responseBody) => requestResponseBodyCallback.ResponseReceived(operationId, method, url, requestBody, responseBody));
 
             var session = ProtonApiSession.Resume(sessionResumeRequest);
 
@@ -155,12 +159,14 @@ internal static class InteropProtonApiSession
 
     private static async ValueTask<Result<InteropArray, InteropArray>> InteropBeginAsync(
         InteropArray sessionBeginRequestBytes,
+        InteropRequestResponseBodyCallback requestResponseBodyCallback,
         CancellationToken cancellationToken)
     {
         try
         {
             var sessionBeginRequest = SessionBeginRequest.Parser.ParseFrom(sessionBeginRequestBytes.AsReadOnlySpan());
-
+            sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () =>
+                new ResponsePassingHttpHandler((operationId, method, url, requestBody, responseBody) => requestResponseBodyCallback.ResponseReceived(operationId, method, url, requestBody, responseBody));
             var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken).ConfigureAwait(false);
 
             var handle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
@@ -183,6 +189,32 @@ internal static class InteropProtonApiSession
         catch (Exception e)
         {
             return ResultExtensions.Failure(e);
+        }
+    }
+
+    private sealed class ResponsePassingHttpHandler(Action<byte[], HttpMethod, Uri?, string, string> passResponse) : DelegatingHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var shouldPassResponse = request.Options.TryGetValue(new HttpRequestOptionsKey<byte[]>("ShouldBePassedWithOperationId"), out var operationId);
+            var message = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (operationId is null || !shouldPassResponse || !message.IsSuccessStatusCode)
+            {
+                return message;
+            }
+
+            var requestBody = request.Content is not null
+                ? await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)
+                : string.Empty;
+            var responseBody = await message.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            passResponse(
+                operationId,
+                request.Method,
+                request.RequestUri,
+                requestBody,
+                responseBody);
+            return message;
         }
     }
 }

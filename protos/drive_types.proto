@@ -153,6 +153,7 @@ message FileDownloadRequest {
     NodeIdentity file_identity = 1;
     RevisionMetadata revision_metadata = 2;
     string target_file_path = 3;
+    OperationIdentifier operation_id = 4;
 }
 
 // Mark: - Uploads
@@ -171,6 +172,7 @@ message FileUploadRequest {
     string source_file_path = 5;
     optional bytes thumbnail = 6;
     int64 last_modification_date = 7;
+    OperationIdentifier operation_id = 8;
 }
 
 message FileUploadResponse {
@@ -186,6 +188,7 @@ message RevisionUploadRequest {
     optional bytes thumbnail = 4;
     int64 last_modification_date = 5;
     string source_file_path = 6; // Do we need this?
+    OperationIdentifier operation_id = 7;
 }
 
 message ProgressUpdate {

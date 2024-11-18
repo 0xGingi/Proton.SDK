@@ -7,11 +7,11 @@ internal readonly struct FilesApiClient(HttpClient httpClient)
 {
     private readonly HttpClient _httpClient = httpClient;
 
-    public async Task<FileCreationResponse> CreateFileAsync(ShareId shareId, FileCreationParameters parameters, CancellationToken cancellationToken)
+    public async Task<FileCreationResponse> CreateFileAsync(ShareId shareId, FileCreationParameters parameters, CancellationToken cancellationToken, byte[]? operationId = null)
     {
         return await _httpClient
             .Expecting(ProtonDriveApiSerializerContext.Default.FileCreationResponse, ProtonDriveApiSerializerContext.Default.RevisionConflictResponse)
-            .PostAsync($"shares/{shareId}/files", parameters, ProtonDriveApiSerializerContext.Default.FileCreationParameters, cancellationToken)
+            .PostAsync($"shares/{shareId}/files", parameters, ProtonDriveApiSerializerContext.Default.FileCreationParameters, cancellationToken, operationId)
             .ConfigureAwait(false);
     }
 
@@ -19,7 +19,8 @@ internal readonly struct FilesApiClient(HttpClient httpClient)
         ShareId shareId,
         LinkId linkId,
         RevisionCreationParameters parameters,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         return await _httpClient
             .Expecting(ProtonDriveApiSerializerContext.Default.RevisionCreationResponse, ProtonDriveApiSerializerContext.Default.RevisionConflictResponse)
@@ -27,7 +28,8 @@ internal readonly struct FilesApiClient(HttpClient httpClient)
                 $"shares/{shareId}/files/{linkId}/revisions",
                 parameters,
                 ProtonDriveApiSerializerContext.Default.RevisionCreationParameters,
-                cancellationToken)
+                cancellationToken,
+                operationId)
             .ConfigureAwait(false);
     }
 
@@ -45,13 +47,15 @@ internal readonly struct FilesApiClient(HttpClient httpClient)
         int fromBlockIndex,
         int pageSize,
         bool noBlockUrls,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         return await _httpClient
             .Expecting(ProtonDriveApiSerializerContext.Default.RevisionResponse)
             .GetAsync(
                 $"shares/{shareId}/files/{linkId}/revisions/{revisionId}?FromBlockIndex={fromBlockIndex}&PageSize={pageSize}&NoBlockUrls={(noBlockUrls ? 1 : 0)}",
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                operationId).ConfigureAwait(false);
     }
 
     public async Task<RevisionListResponse> GetRevisionsAsync(ShareId shareId, LinkId linkId, CancellationToken cancellationToken)
@@ -73,7 +77,8 @@ internal readonly struct FilesApiClient(HttpClient httpClient)
         LinkId linkId,
         RevisionId revisionId,
         RevisionUpdateParameters parameters,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         return await _httpClient
             .Expecting(ProtonDriveApiSerializerContext.Default.ApiResponse)
@@ -81,6 +86,7 @@ internal readonly struct FilesApiClient(HttpClient httpClient)
                 $"shares/{shareId}/files/{linkId}/revisions/{revisionId}",
                 parameters,
                 ProtonDriveApiSerializerContext.Default.RevisionUpdateParameters,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                operationId).ConfigureAwait(false);
     }
 }

@@ -56,7 +56,8 @@ public sealed partial class Revision : IRevisionForTransfer
         IShareForCommand share,
         INodeIdentity file,
         RevisionId knownLastRevisionId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         var parameters = new RevisionCreationParameters
         {
@@ -67,7 +68,7 @@ public sealed partial class Revision : IRevisionForTransfer
         RevisionId revisionId;
         try
         {
-            var revisionResponse = await client.FilesApi.CreateRevisionAsync(share.ShareId, file.NodeId, parameters, cancellationToken).ConfigureAwait(false);
+            var revisionResponse = await client.FilesApi.CreateRevisionAsync(share.ShareId, file.NodeId, parameters, cancellationToken, operationId).ConfigureAwait(false);
 
             revisionId = new RevisionId(revisionResponse.Identity.RevisionId);
         }
@@ -88,7 +89,8 @@ public sealed partial class Revision : IRevisionForTransfer
         ProtonDriveClient client,
         INodeIdentity fileIdentity,
         IRevisionForTransfer revisionMetadata,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         if (revisionMetadata.State is RevisionState.Draft)
         {
@@ -104,7 +106,8 @@ public sealed partial class Revision : IRevisionForTransfer
             RevisionReader.MinBlockIndex,
             RevisionReader.BlockPageSize,
             false,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            operationId).ConfigureAwait(false);
 
         await client.BlockDownloader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 

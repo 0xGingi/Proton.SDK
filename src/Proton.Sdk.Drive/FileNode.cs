@@ -34,7 +34,8 @@ public sealed partial class FileNode : INode
     internal static async Task<FileUploadResponse> CreateFileAsync(
         ProtonDriveClient client,
         FileUploadRequest fileUploadRequest,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         var parentFolderIdentity = fileUploadRequest.ParentFolderIdentity;
         var parentFolderKey = await Node.GetKeyAsync(client, parentFolderIdentity, cancellationToken).ConfigureAwait(false);
@@ -86,7 +87,7 @@ public sealed partial class FileNode : INode
         RevisionId createdRevisionId;
         try
         {
-            var response = await client.FilesApi.CreateFileAsync(parentFolderIdentity.ShareId, parameters, cancellationToken).ConfigureAwait(false);
+            var response = await client.FilesApi.CreateFileAsync(parentFolderIdentity.ShareId, parameters, cancellationToken, operationId).ConfigureAwait(false);
 
             createdNodeId = new LinkId(response.Identities.LinkId);
             createdRevisionId = new RevisionId(response.Identities.RevisionId);

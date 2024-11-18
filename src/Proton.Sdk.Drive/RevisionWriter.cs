@@ -55,7 +55,8 @@ public sealed class RevisionWriter : IDisposable
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
         Action<long, long> onProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         long numberOfBytesUploaded = 0;
 
@@ -171,7 +172,7 @@ public sealed class RevisionWriter : IDisposable
 
         var parameters = GetRevisionUpdateParameters(contentInputStream, lastModificationTime, blockSizes, manifestSignature, signinEmailAddress);
 
-        await _client.FilesApi.UpdateRevisionAsync(_shareMetadata.ShareId, _fileId, _revisionId, parameters, cancellationToken).ConfigureAwait(false);
+        await _client.FilesApi.UpdateRevisionAsync(_shareMetadata.ShareId, _fileId, _revisionId, parameters, cancellationToken, operationId).ConfigureAwait(false);
     }
 
     public void Dispose()

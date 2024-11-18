@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Google.Protobuf;
 using Proton.Sdk.CExports;
 
 namespace Proton.Sdk.Drive.CExports;
@@ -89,7 +90,11 @@ internal static class InteropFileDownloader
         }
     }
 
-    private static async ValueTask<Result<InteropArray, InteropArray>> InteropDownloadFileAsync(FileDownloader downloader, InteropArray fileDownloadRequestBytes, InteropProgressCallback progressCallback, CancellationToken cancellationToken)
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropDownloadFileAsync(
+        FileDownloader downloader,
+        InteropArray fileDownloadRequestBytes,
+        InteropProgressCallback progressCallback,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -100,7 +105,8 @@ internal static class InteropFileDownloader
                 fileDownloadRequest.RevisionMetadata,
                 fileDownloadRequest.TargetFilePath,
                 (completed, total) => progressCallback.UpdateProgress(completed, total),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                fileDownloadRequest.OperationId.ToByteArray()).ConfigureAwait(false);
 
             return ResultExtensions.Success(new IntResponse { Value = 0 });
         }

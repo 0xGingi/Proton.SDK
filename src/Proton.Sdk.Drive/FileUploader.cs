@@ -40,7 +40,12 @@ public sealed class FileUploader : IDisposable
         }
         catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { RevisionId: not null, DraftRevisionId: null } })
         {
-            var conflictingNode = await Node.GetAsync(_client, shareMetadata.ShareId, new LinkId(ex.Response.Conflict.LinkId), cancellationToken).ConfigureAwait(false);
+            var conflictingNode = await Node.GetAsync(
+                    _client,
+                    shareMetadata.ShareId,
+                    new LinkId(ex.Response.Conflict.LinkId),
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (conflictingNode is not FileNode conflictingFile)
             {
                 throw;
@@ -49,12 +54,26 @@ public sealed class FileUploader : IDisposable
             fileUploadResponse = new FileUploadResponse
             {
                 File = conflictingFile,
-                Revision = await Revision.CreateAsync(_client, shareMetadata, conflictingFile.NodeIdentity, new RevisionId(ex.Response.Conflict.RevisionId), cancellationToken)
+                Revision = await Revision.CreateAsync(
+                        _client,
+                        shareMetadata,
+                        conflictingFile.NodeIdentity,
+                        new RevisionId(ex.Response.Conflict.RevisionId),
+                        cancellationToken)
                     .ConfigureAwait(false)
             };
         }
 
-        await UploadAsync(shareMetadata, fileUploadResponse.File.NodeIdentity, fileUploadResponse.Revision, contentInputStream, samples, lastModificationTime, onProgress, cancellationToken).ConfigureAwait(false);
+        await UploadAsync(
+                shareMetadata,
+                fileUploadResponse.File.NodeIdentity,
+                fileUploadResponse.Revision,
+                contentInputStream,
+                samples,
+                lastModificationTime,
+                onProgress,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         return fileUploadResponse.File;
     }
@@ -68,7 +87,8 @@ public sealed class FileUploader : IDisposable
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
         Action<long, long> onProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         parentFolderIdentity = new NodeIdentity(shareMetadata.ShareId, parentFolderIdentity);
 
@@ -79,9 +99,19 @@ public sealed class FileUploader : IDisposable
             MimeType = mediaType,
             Name = name,
         };
-        var fileCreationResponse = await FileNode.CreateFileAsync(_client, fileCreationRequest, cancellationToken).ConfigureAwait(false);
+        var fileCreationResponse = await FileNode.CreateFileAsync(_client, fileCreationRequest, cancellationToken, operationId).ConfigureAwait(false);
 
-        await UploadAsync(shareMetadata, fileCreationResponse.File.NodeIdentity, fileCreationResponse.Revision, contentInputStream, samples, lastModificationTime, onProgress, cancellationToken).ConfigureAwait(false);
+        await UploadAsync(
+                shareMetadata,
+                fileCreationResponse.File.NodeIdentity,
+                fileCreationResponse.Revision,
+                contentInputStream,
+                samples,
+                lastModificationTime,
+                onProgress,
+                cancellationToken,
+                operationId)
+            .ConfigureAwait(false);
 
         return new FileUploadResponse
         {
@@ -98,11 +128,29 @@ public sealed class FileUploader : IDisposable
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
         Action<long, long> onProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
-        var revision = await Revision.CreateAsync(_client, shareMetadata, fileIdentity, lastKnownRevisionId, cancellationToken).ConfigureAwait(false);
+        var revision = await Revision.CreateAsync(
+                _client,
+                shareMetadata,
+                fileIdentity,
+                lastKnownRevisionId,
+                cancellationToken,
+                operationId)
+            .ConfigureAwait(false);
 
-        await UploadAsync(shareMetadata, fileIdentity, revision, contentInputStream, samples, lastModificationTime, onProgress, cancellationToken).ConfigureAwait(false);
+        await UploadAsync(
+                shareMetadata,
+                fileIdentity,
+                revision,
+                contentInputStream,
+                samples,
+                lastModificationTime,
+                onProgress,
+                cancellationToken,
+                operationId)
+            .ConfigureAwait(false);
 
         return revision;
     }
@@ -121,7 +169,8 @@ public sealed class FileUploader : IDisposable
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
         Action<long, long> onProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         var fileUploadRequest = new RevisionUploadRequest
         {
@@ -132,7 +181,7 @@ public sealed class FileUploader : IDisposable
 
         using var revisionWriter = await Revision.OpenForWritingAsync(_client, fileUploadRequest, ReleaseBlocks, cancellationToken).ConfigureAwait(false);
 
-        await revisionWriter.WriteAsync(contentInputStream, samples, lastModificationTime, onProgress, cancellationToken).ConfigureAwait(false);
+        await revisionWriter.WriteAsync(contentInputStream, samples, lastModificationTime, onProgress, cancellationToken, operationId).ConfigureAwait(false);
     }
 
     private void ReleaseBlocks(int numberOfBlocks)

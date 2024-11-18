@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Google.Protobuf;
 using Proton.Sdk.CExports;
 
 namespace Proton.Sdk.Drive.CExports;
@@ -147,7 +148,8 @@ internal static class InteropFileUploader
                     samples,
                     DateTimeOffset.FromUnixTimeSeconds(fileUploadRequest.LastModificationDate),
                     (completed, total) => progressCallback.UpdateProgress(completed, total),
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    fileUploadRequest.OperationId.ToByteArray()).ConfigureAwait(false);
 
                 return ResultExtensions.Success(response);
             }
@@ -184,7 +186,8 @@ internal static class InteropFileUploader
                     samples,
                     DateTimeOffset.FromUnixTimeSeconds(revisionUploadRequest.LastModificationDate),
                     (completed, total) => progressCallback.UpdateProgress(completed, total),
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    revisionUploadRequest.OperationId.ToByteArray()).ConfigureAwait(false);
 
                 return ResultExtensions.Success(response);
             }
