@@ -8,11 +8,11 @@ namespace Proton.Sdk.Drive.CExports;
 
 internal static class InteropFileUploader
 {
-    private static bool TryGetFromHandle(nint uploaderHandle, [MaybeNullWhen(false)] out FileUploader uploader)
+    private static bool TryGetFromHandle(nint uploaderHandle, [MaybeNullWhen(false)] out IFileUploader uploader)
     {
         var gcHandle = GCHandle.FromIntPtr(uploaderHandle);
 
-        uploader = gcHandle.Target as FileUploader;
+        uploader = gcHandle.Target as IFileUploader;
 
         return uploader is not null;
     }
@@ -122,7 +122,7 @@ internal static class InteropFileUploader
     }
 
     private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadFileAsync(
-        FileUploader uploader,
+        IFileUploader uploader,
         InteropArray fileUploadRequestBytes,
         InteropProgressCallback progressCallback,
         CancellationToken cancellationToken)
@@ -161,7 +161,7 @@ internal static class InteropFileUploader
     }
 
     private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadRevisionAsync(
-        FileUploader uploader,
+        IFileUploader uploader,
         InteropArray revisionUploadRequestBytes,
         InteropProgressCallback progressCallback,
         CancellationToken cancellationToken)
