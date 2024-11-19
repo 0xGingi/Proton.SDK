@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Proton.Cryptography.Pgp;
+using Proton.Sdk.Http;
 
 namespace Proton.Sdk.CExports;
 
@@ -43,13 +44,9 @@ internal static class InteropProtonApiSession
         try
         {
             var sessionResumeRequest = SessionResumeRequest.Parser.ParseFrom(sessionResumeRequestBytes.AsReadOnlySpan());
-            sessionResumeRequest.Options.CustomHttpMessageHandlerFactory = () =>
-                new ResponsePassingHttpHandler((operationId, method, url, requestBody, responseBody) => requestResponseBodyCallback.ResponseReceived(operationId, method, url, requestBody, responseBody));
-
+            sessionResumeRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
             var session = ProtonApiSession.Resume(sessionResumeRequest);
-
             *sessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
-
             return 0;
         }
         catch
@@ -165,8 +162,7 @@ internal static class InteropProtonApiSession
         try
         {
             var sessionBeginRequest = SessionBeginRequest.Parser.ParseFrom(sessionBeginRequestBytes.AsReadOnlySpan());
-            sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () =>
-                new ResponsePassingHttpHandler((operationId, method, url, requestBody, responseBody) => requestResponseBodyCallback.ResponseReceived(operationId, method, url, requestBody, responseBody));
+            sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
             var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken).ConfigureAwait(false);
 
             var handle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
@@ -189,32 +185,6 @@ internal static class InteropProtonApiSession
         catch (Exception e)
         {
             return ResultExtensions.Failure(e);
-        }
-    }
-
-    private sealed class ResponsePassingHttpHandler(Action<byte[], HttpMethod, Uri?, string, string> passResponse) : DelegatingHandler
-    {
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var shouldPassResponse = request.Options.TryGetValue(new HttpRequestOptionsKey<byte[]>("ShouldBePassedWithOperationId"), out var operationId);
-            var message = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
-
-            if (operationId is null || !shouldPassResponse || !message.IsSuccessStatusCode)
-            {
-                return message;
-            }
-
-            var requestBody = request.Content is not null
-                ? await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)
-                : string.Empty;
-            var responseBody = await message.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            passResponse(
-                operationId,
-                request.Method,
-                request.RequestUri,
-                requestBody,
-                responseBody);
-            return message;
         }
     }
 }
