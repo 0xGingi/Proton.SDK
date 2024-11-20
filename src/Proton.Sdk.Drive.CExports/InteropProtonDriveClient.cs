@@ -19,7 +19,7 @@ internal static class InteropProtonDriveClient
     }
 
     [UnmanagedCallersOnly(EntryPoint = "drive_client_create", CallConvs = [typeof(CallConvCdecl)])]
-    private static unsafe int NativeCreate(nint sessionHandle, nint observabilityServiceHandle, nint* clientHandle)
+    private static unsafe int NativeCreate(nint sessionHandle, nint observabilityServiceHandle, InteropArray requestBytes, nint* clientHandle)
     {
         try
         {
@@ -33,7 +33,14 @@ internal static class InteropProtonDriveClient
                 return -1;
             }
 
-            var client = new ProtonDriveClient(session, new ProtonDriveClientOptions { InstrumentationMeter = observabilityService });
+            var request = ProtonDriveClientCreateRequest.Parser.ParseFrom(requestBytes.AsReadOnlySpan());
+
+            var options = new ProtonDriveClientOptions
+            {
+                InstrumentationMeter = observabilityService,
+                ClientId = request.ClientId.Value,
+            };
+            var client = new ProtonDriveClient(session, options);
 
             *clientHandle = GCHandle.ToIntPtr(GCHandle.Alloc(client));
 

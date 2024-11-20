@@ -22,7 +22,8 @@ public sealed class FileUploader : IFileUploader
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
         Action<long, long> onProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         parentFolderIdentity = new NodeIdentity(shareMetadata.ShareId, parentFolderIdentity);
         var fileUploadRequest = new FileUploadRequest
@@ -36,7 +37,7 @@ public sealed class FileUploader : IFileUploader
         FileUploadResponse fileUploadResponse;
         try
         {
-            fileUploadResponse = await FileNode.CreateFileAsync(_client, fileUploadRequest, cancellationToken).ConfigureAwait(false);
+            fileUploadResponse = await FileNode.CreateFileAsync(_client, fileUploadRequest, cancellationToken, operationId).ConfigureAwait(false);
         }
         catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { RevisionId: not null, DraftRevisionId: null } })
         {
@@ -44,7 +45,8 @@ public sealed class FileUploader : IFileUploader
                     _client,
                     shareMetadata.ShareId,
                     new LinkId(ex.Response.Conflict.LinkId),
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    operationId).ConfigureAwait(false);
 
             if (conflictingNode is not FileNode conflictingFile)
             {
@@ -59,7 +61,8 @@ public sealed class FileUploader : IFileUploader
                         shareMetadata,
                         conflictingFile.NodeIdentity,
                         new RevisionId(ex.Response.Conflict.RevisionId),
-                        cancellationToken).ConfigureAwait(false),
+                        cancellationToken,
+                        operationId).ConfigureAwait(false),
             };
         }
 
@@ -71,7 +74,8 @@ public sealed class FileUploader : IFileUploader
                 samples,
                 lastModificationTime,
                 onProgress,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                operationId).ConfigureAwait(false);
 
         return fileUploadResponse.File;
     }
@@ -174,7 +178,7 @@ public sealed class FileUploader : IFileUploader
             RevisionMetadata = revision.Metadata(),
         };
 
-        using var revisionWriter = await Revision.OpenForWritingAsync(_client, fileUploadRequest, ReleaseBlocks, cancellationToken).ConfigureAwait(false);
+        using var revisionWriter = await Revision.OpenForWritingAsync(_client, fileUploadRequest, ReleaseBlocks, cancellationToken, operationId).ConfigureAwait(false);
 
         await revisionWriter.WriteAsync(contentInputStream, samples, lastModificationTime, onProgress, cancellationToken, operationId).ConfigureAwait(false);
     }

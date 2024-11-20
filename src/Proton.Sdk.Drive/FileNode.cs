@@ -183,14 +183,15 @@ public sealed partial class FileNode : INode
     internal static async Task<PgpSessionKey> GetFileContentKeyAsync(
         ProtonDriveClient client,
         INodeIdentity nodeIdentity,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         if (!client.SecretsCache.TryUse(
             Node.GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
             (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
             out var nameKey))
         {
-            await Node.GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
+            await Node.GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken, operationId).ConfigureAwait(false);
 
             if (!client.SecretsCache.TryUse(
                 Node.GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),

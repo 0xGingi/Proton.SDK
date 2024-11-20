@@ -118,15 +118,16 @@ public sealed partial class Revision : IRevisionForTransfer
         ProtonDriveClient client,
         RevisionUploadRequest revisionUploadRequest,
         Action<int> releaseBlocksAction,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         if (revisionUploadRequest.RevisionMetadata.State is not RevisionState.Draft)
         {
             throw new InvalidOperationException("Non-draft revision cannot be opened for writing");
         }
 
-        var fileKey = await Node.GetKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken).ConfigureAwait(false);
-        var contentKey = await FileNode.GetFileContentKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken).ConfigureAwait(false);
+        var fileKey = await Node.GetKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken, operationId).ConfigureAwait(false);
+        var contentKey = await FileNode.GetFileContentKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken, operationId).ConfigureAwait(false);
         var signingKey = await client.Account.GetAddressPrimaryKeyAsync(revisionUploadRequest.ShareMetadata.MembershipAddressId, cancellationToken).ConfigureAwait(false);
 
         await client.BlockUploader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);

@@ -7,11 +7,11 @@ internal readonly struct LinksApiClient(HttpClient httpClient)
 {
     private readonly HttpClient _httpClient = httpClient;
 
-    public async Task<LinkResponse> GetLinkAsync(ShareId shareId, LinkId linkId, CancellationToken cancellationToken)
+    public async Task<LinkResponse> GetLinkAsync(ShareId shareId, LinkId linkId, CancellationToken cancellationToken, byte[]? operationId = null)
     {
         return await _httpClient
             .Expecting(ProtonDriveApiSerializerContext.Default.LinkResponse)
-            .GetAsync($"shares/{shareId}/links/{linkId}", cancellationToken).ConfigureAwait(false);
+            .GetAsync($"shares/{shareId}/links/{linkId}", cancellationToken, operationId).ConfigureAwait(false);
     }
 
     public async Task<ApiResponse> MoveLinkAsync(ShareId shareId, LinkId linkId, MoveLinkParameters parameters, CancellationToken cancellationToken)

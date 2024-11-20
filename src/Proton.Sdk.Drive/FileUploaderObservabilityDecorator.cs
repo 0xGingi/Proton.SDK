@@ -24,7 +24,8 @@ public sealed class FileUploaderObservabilityDecorator : IFileUploader
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
         Action<long, long> onProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         try
         {
@@ -37,7 +38,8 @@ public sealed class FileUploaderObservabilityDecorator : IFileUploader
                 samples,
                 lastModificationTime,
                 onProgress,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                operationId).ConfigureAwait(false);
 
             _uploadAttemptRetryMonitor.IncrementSuccess(parentFolderIdentity.VolumeId, parentFolderIdentity.NodeId, name);
 

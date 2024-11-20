@@ -142,7 +142,7 @@ enum RevisionState {
 }
 
 message ShareBasedRevisionIdentity {
-    ShareId shareId = 1;
+    ShareId share_id = 1;
     LinkId node_id = 2;
     RevisionId revision_id = 3;
 }
@@ -198,10 +198,13 @@ message ProgressUpdate {
 
 // Mark: - Other operations
 
-message NodeNameDecryptionRequest {
-    NodeIdentity node_identity = 1;
-    string armored_encrypted_name = 2;
+// Object initialization
+
+message ProtonDriveClientCreateRequest {
+    ClientId client_id = 1;
 }
+
+// Verification
 
 enum VerificationStatus {
     VERIFICATION_STATUS_OK = 0;
@@ -239,6 +242,9 @@ message DeviceId {
 message RevisionId {
     string value = 1;
 }
+message ClientId {
+    string value = 1;
+}
 
 // Cryptography
 
@@ -246,4 +252,9 @@ message NodeKeysRegistrationRequest {
     NodeIdentity node_identity = 1;
     bytes node_key_raw_unlocked_data = 2;
     optional bytes content_key_raw_unlocked_data = 3;
+}
+
+message NodeNameDecryptionRequest {
+    NodeIdentity node_identity = 1;
+    string armored_encrypted_name = 2;
 }

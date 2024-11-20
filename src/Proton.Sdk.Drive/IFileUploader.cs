@@ -11,7 +11,8 @@ public interface IFileUploader : IDisposable
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
         Action<long, long> onProgress,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        byte[]? operationId = null);
 
     public Task<FileUploadResponse> UploadNewFileAsync(
         ShareMetadata shareMetadata,

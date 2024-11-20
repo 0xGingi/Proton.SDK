@@ -35,7 +35,7 @@ internal static class InteropFileUploader
         }
     }
 
-    [UnmanagedCallersOnly(EntryPoint = "uploader_upload_file", CallConvs = [typeof(CallConvCdecl)])]
+    [UnmanagedCallersOnly(EntryPoint = "uploader_upload_file_or_revision", CallConvs = [typeof(CallConvCdecl)])]
     private static int NativeUploadFile(nint uploaderHandle, InteropArray fileUploadRequestBytes, InteropAsyncCallbackWithProgress callback)
     {
         try
@@ -45,7 +45,7 @@ internal static class InteropFileUploader
                 return -1;
             }
 
-            return callback.AsyncCallback.InvokeFor(ct => InteropUploadFileAsync(uploader, fileUploadRequestBytes, callback.ProgressCallback, ct));
+            return callback.AsyncCallback.InvokeFor(ct => InteropUploadFileOrRevisionAsync(uploader, fileUploadRequestBytes, callback.ProgressCallback, ct));
         }
         catch
         {
@@ -121,7 +121,7 @@ internal static class InteropFileUploader
         }
     }
 
-    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadFileAsync(
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropUploadFileOrRevisionAsync(
         IFileUploader uploader,
         InteropArray fileUploadRequestBytes,
         InteropProgressCallback progressCallback,
@@ -139,7 +139,7 @@ internal static class InteropFileUploader
 
             await using (fileStream)
             {
-                var response = await uploader.UploadNewFileAsync(
+                var response = await uploader.UploadNewFileOrRevisionAsync(
                     fileUploadRequest.ShareMetadata,
                     fileUploadRequest.ParentFolderIdentity,
                     fileUploadRequest.Name,

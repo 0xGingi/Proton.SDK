@@ -48,9 +48,14 @@ public partial class Node : INode
     public ByteString NameHashDigest { get; }
     public NodeState State { get; }
 
-    internal static async Task<INode> GetAsync(ProtonDriveClient client, ShareId shareId, LinkId itemId, CancellationToken cancellationToken)
+    internal static async Task<INode> GetAsync(
+        ProtonDriveClient client,
+        ShareId shareId,
+        LinkId itemId,
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
-        var response = await client.LinksApi.GetLinkAsync(shareId, itemId, cancellationToken).ConfigureAwait(false);
+        var response = await client.LinksApi.GetLinkAsync(shareId, itemId, cancellationToken, operationId).ConfigureAwait(false);
 
         return await GetAsync(client, shareId, response.Link, cancellationToken).ConfigureAwait(false);
     }
@@ -148,11 +153,12 @@ public partial class Node : INode
     internal static async Task<PgpPrivateKey> GetKeyAsync(
         ProtonDriveClient client,
         INodeIdentity nodeIdentity,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? operationId = null)
     {
         if (!client.SecretsCache.TryUse(GetNodeKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => PgpPrivateKey.Import(data), out var key))
         {
-            await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
+            await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken, operationId).ConfigureAwait(false);
 
             if (!client.SecretsCache.TryUse(GetNodeKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => PgpPrivateKey.Import(data), out key))
             {
