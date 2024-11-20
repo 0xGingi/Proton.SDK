@@ -15,7 +15,8 @@ namespace Proton.Sdk.Drive;
 
 public sealed class ProtonDriveClient
 {
-    private readonly HttpClient _httpClient;
+    private readonly HttpClient _defaultHttpClient;
+    private readonly HttpClient _storageHttpClient;
     private readonly UploadAttemptRetryMonitor? _uploadAttemptRetryMonitor;
 
     /// <summary>
@@ -25,7 +26,8 @@ public sealed class ProtonDriveClient
     /// <param name="options">Specifies options for <see cref="ProtonDriveClient" /></param>
     public ProtonDriveClient(ProtonApiSession session, in ProtonDriveClientOptions options = default)
     {
-        _httpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute);
+        _defaultHttpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute, TimeSpan.FromSeconds(15));
+        _storageHttpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute, TimeSpan.FromMinutes(15));
         _uploadAttemptRetryMonitor = options.InstrumentationMeter is not null
             ? new UploadAttemptRetryMonitor(options.InstrumentationMeter)
             : default;
@@ -52,14 +54,14 @@ public sealed class ProtonDriveClient
     internal ProtonAccountClient Account { get; }
     internal ISecretsCache SecretsCache { get; }
 
-    internal VolumesApiClient VolumesApi => new(_httpClient);
-    internal DevicesApiClient DevicesApi => new(_httpClient);
-    internal SharesApiClient SharesApi => new(_httpClient);
-    internal LinksApiClient LinksApi => new(_httpClient);
-    internal FoldersApiClient FoldersApi => new(_httpClient);
-    internal FilesApiClient FilesApi => new(_httpClient);
-    internal StorageApiClient StorageApi => new(_httpClient);
-    internal RevisionVerificationApiClient RevisionVerificationApi => new(_httpClient);
+    internal VolumesApiClient VolumesApi => new(_defaultHttpClient);
+    internal DevicesApiClient DevicesApi => new(_defaultHttpClient);
+    internal SharesApiClient SharesApi => new(_defaultHttpClient);
+    internal LinksApiClient LinksApi => new(_defaultHttpClient);
+    internal FoldersApiClient FoldersApi => new(_defaultHttpClient);
+    internal FilesApiClient FilesApi => new(_defaultHttpClient);
+    internal StorageApiClient StorageApi => new(_storageHttpClient);
+    internal RevisionVerificationApiClient RevisionVerificationApi => new(_defaultHttpClient);
 
     internal BlockUploader BlockUploader { get; }
     internal BlockDownloader BlockDownloader { get; }

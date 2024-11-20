@@ -267,9 +267,9 @@ public sealed class ProtonApiSession
     internal static CacheKey GetUserKeyPassphraseCacheKey(UserKeyId keyId) => GetAccountKeyPassphraseCacheKey(keyId.Value);
     internal static CacheKey GetLegacyAddressKeyPassphraseCacheKey(AddressKeyId keyId) => GetAccountKeyPassphraseCacheKey(keyId.Value);
 
-    internal HttpClient GetHttpClient(string? baseRoutePath = default)
+    internal HttpClient GetHttpClient(string? baseRoutePath = default, TimeSpan? attemptTimeout = default)
     {
-        return baseRoutePath is null ? _httpClient : Configuration.GetHttpClient(this, baseRoutePath);
+        return baseRoutePath is null && attemptTimeout is null ? _httpClient : Configuration.GetHttpClient(this, baseRoutePath, attemptTimeout);
     }
 
     private static ReadOnlyMemory<byte> DeriveSecretFromPassword(ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt)

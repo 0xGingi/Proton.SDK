@@ -11,7 +11,11 @@ internal static class ProtonClientConfigurationExtensions
 {
     private static readonly CookieContainer CookieContainer = new();
 
-    public static HttpClient GetHttpClient(this ProtonClientConfiguration config, ProtonApiSession? session = null, string? baseRoutePath = default)
+    public static HttpClient GetHttpClient(
+        this ProtonClientConfiguration config,
+        ProtonApiSession? session = null,
+        string? baseRoutePath = default,
+        TimeSpan? attemptTimeout = default)
     {
         var baseAddress = config.BaseUrl + (baseRoutePath ?? string.Empty);
 
@@ -22,20 +26,21 @@ internal static class ProtonClientConfigurationExtensions
         services.ConfigureHttpClientDefaults(
             builder =>
             {
-                builder.UseSocketsHttpHandler((handler, _) =>
-                {
-                    handler.AddAutomaticDecompression();
-                    handler.ConfigureCookies(CookieContainer);
+                builder.UseSocketsHttpHandler(
+                    (handler, _) =>
+                    {
+                        handler.AddAutomaticDecompression();
+                        handler.ConfigureCookies(CookieContainer);
 
-                    if (config.IgnoreSslCertificateErrors)
-                    {
-                        handler.SslOptions.RemoteCertificateValidationCallback += (_, _, _, _) => true;
-                    }
-                    else if (!config.DisableTlsPinning)
-                    {
-                        handler.AddTlsPinning();
-                    }
-                });
+                        if (config.IgnoreSslCertificateErrors)
+                        {
+                            handler.SslOptions.RemoteCertificateValidationCallback += (_, _, _, _) => true;
+                        }
+                        else if (!config.DisableTlsPinning)
+                        {
+                            handler.AddTlsPinning();
+                        }
+                    });
 
                 if (config.CustomHttpMessageHandlerFactory is not null)
                 {
@@ -45,12 +50,21 @@ internal static class ProtonClientConfigurationExtensions
                 builder.AddStandardResilienceHandler(
                     options =>
                     {
-                        options.TotalRequestTimeout = new HttpTimeoutStrategyOptions { Timeout = TimeSpan.FromMinutes(1) };
+                        if (attemptTimeout is not null)
+                        {
+                            options.AttemptTimeout.Timeout = attemptTimeout.Value;
+                            options.CircuitBreaker.SamplingDuration = options.AttemptTimeout.Timeout * 3;
+                        }
+
                         options.Retry.ShouldRetryAfterHeader = true;
                         options.Retry.Delay = TimeSpan.FromSeconds(2.5);
                         options.Retry.BackoffType = DelayBackoffType.Exponential;
                         options.Retry.UseJitter = true;
                         options.Retry.MaxRetryAttempts = 4;
+
+                        var totalTimeout = (options.AttemptTimeout.Timeout + options.Retry.Delay) * options.Retry.MaxRetryAttempts * 1.5;
+                        options.TotalRequestTimeout = new HttpTimeoutStrategyOptions { Timeout = totalTimeout };
+
                         options.CircuitBreaker.FailureRatio = 0.5;
                     });
 
@@ -59,12 +73,13 @@ internal static class ProtonClientConfigurationExtensions
                     builder.AddHttpMessageHandler(() => new AuthorizationHandler(session));
                 }
 
-                builder.ConfigureHttpClient(httpClient =>
-                {
-                    httpClient.BaseAddress = new Uri(baseAddress);
-                    httpClient.DefaultRequestHeaders.Add("x-pm-appversion", config.AppVersion);
-                    httpClient.DefaultRequestHeaders.Add("User-Agent", config.UserAgent);
-                });
+                builder.ConfigureHttpClient(
+                    httpClient =>
+                    {
+                        httpClient.BaseAddress = new Uri(baseAddress);
+                        httpClient.DefaultRequestHeaders.Add("x-pm-appversion", config.AppVersion);
+                        httpClient.DefaultRequestHeaders.Add("User-Agent", config.UserAgent);
+                    });
             });
 
         var serviceProvider = services.BuildServiceProvider();
