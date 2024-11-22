@@ -40,6 +40,9 @@ public sealed class ProtonAccountClient(ProtonApiSession session)
         return Address.GetDefaultAsync(this, cancellationToken);
     }
 
+    internal static CacheKey GetUserKeyGroupCacheKey(UserId id) => new(CacheUserValueHolderName, id.Value, CacheUserKeysValueName);
+    internal static CacheKey GetUserKeyCacheKey(UserKeyId id) => new(CacheUserKeyValueHolderName, id.Value, CacheUserKeyDataValueName);
+
     internal async Task<IReadOnlyList<PgpPrivateKey>> GetUserKeysAsync(CancellationToken cancellationToken)
     {
         if (!SecretsCache.TryUseGroup(GetUserKeyGroupCacheKey(_userId), (bytes, _) => PgpPrivateKey.Import(bytes), out var keys))
@@ -78,9 +81,6 @@ public sealed class ProtonAccountClient(ProtonApiSession session)
 
         return publicKeys;
     }
-
-    private static CacheKey GetUserKeyGroupCacheKey(UserId id) => new(CacheUserValueHolderName, id.Value, CacheUserKeysValueName);
-    private static CacheKey GetUserKeyCacheKey(UserKeyId id) => new(CacheUserKeyValueHolderName, id.Value, CacheUserKeyDataValueName);
 
     private async Task RefreshUserKeysAsync(CancellationToken cancellationToken)
     {

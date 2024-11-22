@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Proton.Cryptography.Pgp;
-using Proton.Sdk.Http;
+using Proton.Sdk.Cryptography;
 
 namespace Proton.Sdk.CExports;
 
@@ -84,39 +84,62 @@ internal static class InteropProtonApiSession
         }
     }
 
-    [UnmanagedCallersOnly(EntryPoint = "session_add_user_key", CallConvs = [typeof(CallConvCdecl)])]
-    private static int NativeAddUserKey(nint sessionHandle, InteropArray userKeyData)
+    [UnmanagedCallersOnly(EntryPoint = "session_register_armored_locked_user_key", CallConvs = [typeof(CallConvCdecl)])]
+    private static int NativeRegisterArmoredUserKey(nint sessionHandle, InteropArray armoredUserKeyData)
     {
-        var userKey = UserKey.Parser.ParseFrom(userKeyData.AsReadOnlySpan());
+        try
+        {
+            if (!TryGetFromHandle(sessionHandle, out var session))
+            {
+                return -1;
+            }
 
-        if (!TryGetFromHandle(sessionHandle, out var session))
+            var armoredUserKey = ArmoredUserKey.Parser.ParseFrom(armoredUserKeyData.AsReadOnlySpan());
+
+            using var userKey = PgpPrivateKey.ImportAndUnlock(
+                armoredUserKey.ArmoredKeyData.ToByteArray(),
+                Encoding.UTF8.GetBytes(armoredUserKey.Passphrase),
+                PgpEncoding.AsciiArmor);
+
+            AddUserKeyToCache(session, new UserKeyId(armoredUserKey.KeyId), userKey.ToBytes());
+
+            return 0;
+        }
+        catch
         {
             return -1;
         }
-
-        session.AddUserKey(session.UserId, new UserKeyId(userKey.KeyId), userKey.KeyData.Span);
-
-        return 0;
     }
 
-    [UnmanagedCallersOnly(EntryPoint = "session_add_armored_locked_user_key", CallConvs = [typeof(CallConvCdecl)])]
-    private static int NativeAddArmoredUserKey(nint sessionHandle, InteropArray armoredUserKeyData)
+    [UnmanagedCallersOnly(EntryPoint = "session_register_address_keys", CallConvs = [typeof(CallConvCdecl)])]
+    private static int NativeRegisterAddressKeys(nint sessionHandle, InteropArray requestBytes)
     {
-        var armoredUserKey = ArmoredUserKey.Parser.ParseFrom(armoredUserKeyData.AsReadOnlySpan());
+        try
+        {
+            if (!TryGetFromHandle(sessionHandle, out var session))
+            {
+                return -1;
+            }
 
-        if (!TryGetFromHandle(sessionHandle, out var session))
+            var request = AddressKeyRegistrationRequest.Parser.ParseFrom(requestBytes.AsReadOnlySpan());
+
+            var cacheKeys = new List<CacheKey>(request.Keys.Count);
+
+            foreach (var addressKey in request.Keys)
+            {
+                var cacheKey = Address.GetAddressKeyCacheKey(addressKey.AddressKeyId);
+                session.SecretsCache.Set(cacheKey, addressKey.RawUnlockedData.Span, addressKey.IsPrimary ? (byte)1 : (byte)0);
+                cacheKeys.Add(cacheKey);
+            }
+
+            session.SecretsCache.IncludeInGroup(Address.GetAddressKeyGroupCacheKey(request.AddressId), CollectionsMarshal.AsSpan(cacheKeys));
+
+            return 0;
+        }
+        catch
         {
             return -1;
         }
-
-        using var userKey = PgpPrivateKey.ImportAndUnlock(
-            armoredUserKey.ArmoredKeyData.ToByteArray(),
-            Encoding.UTF8.GetBytes(armoredUserKey.Passphrase),
-            PgpEncoding.AsciiArmor);
-
-        session.AddUserKey(session.UserId, new UserKeyId(armoredUserKey.KeyId), userKey.ToBytes());
-
-        return 0;
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_end", CallConvs = [typeof(CallConvCdecl), typeof(CallConvMemberFunction)])]
@@ -186,5 +209,13 @@ internal static class InteropProtonApiSession
         {
             return ResultExtensions.Failure(e);
         }
+    }
+
+    private static void AddUserKeyToCache(ProtonApiSession session, UserKeyId keyId, ReadOnlySpan<byte> keyData)
+    {
+        var cacheKey = ProtonAccountClient.GetUserKeyCacheKey(keyId);
+        session.SecretsCache.Set(cacheKey, keyData, 1);
+        var cacheKeys = new List<CacheKey>(1) { cacheKey };
+        session.SecretsCache.IncludeInGroup(ProtonAccountClient.GetUserKeyGroupCacheKey(session.UserId), CollectionsMarshal.AsSpan(cacheKeys));
     }
 }

@@ -239,3 +239,11 @@ message DeviceId {
 message RevisionId {
     string value = 1;
 }
+
+// Cryptography
+
+message NodeKeysRegistrationRequest {
+    NodeIdentity node_identity = 1;
+    bytes node_key_raw_unlocked_data = 2;
+    optional bytes content_key_raw_unlocked_data = 3;
+}

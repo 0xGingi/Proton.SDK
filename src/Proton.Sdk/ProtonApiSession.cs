@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Srp;
@@ -256,14 +255,6 @@ public sealed class ProtonApiSession
         return _isEnded;
     }
 
-    public void AddUserKey(UserId userId, UserKeyId keyId, ReadOnlySpan<byte> keyData)
-    {
-        var cacheKey = GetUserKeyPassphraseCacheKey(keyId);
-        Configuration.SecretsCache.Set(cacheKey, keyData, 1);
-        var cacheKeys = new List<CacheKey>(1) { cacheKey };
-        Configuration.SecretsCache.IncludeInGroup(GetUserKeyGroupCacheKey(userId), CollectionsMarshal.AsSpan(cacheKeys));
-    }
-
     internal static CacheKey GetUserKeyPassphraseCacheKey(UserKeyId keyId) => GetAccountKeyPassphraseCacheKey(keyId.Value);
     internal static CacheKey GetLegacyAddressKeyPassphraseCacheKey(AddressKeyId keyId) => GetAccountKeyPassphraseCacheKey(keyId.Value);
 
@@ -281,7 +272,6 @@ public sealed class ProtonApiSession
     }
 
     private static CacheKey GetAccountKeyPassphraseCacheKey(string keyId) => new("account-key", keyId, "passphrase");
-    private static CacheKey GetUserKeyGroupCacheKey(UserId id) => new("user", id.Value, "keys");
 
     private void OnRefreshTokenExpired()
     {

@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Proton.Sdk.CExports;
+using Proton.Sdk.Cryptography;
 using Proton.Sdk.Instrumentation.CExport;
 
 namespace Proton.Sdk.Drive.CExports;
@@ -35,6 +36,30 @@ internal static class InteropProtonDriveClient
             var client = new ProtonDriveClient(session, new ProtonDriveClientOptions { InstrumentationMeter = observabilityService });
 
             *clientHandle = GCHandle.ToIntPtr(GCHandle.Alloc(client));
+
+            return 0;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "drive_client_register_node_keys", CallConvs = [typeof(CallConvCdecl)])]
+    private static int RegisterNodeKeys(nint handle, InteropArray requestBytes)
+    {
+        try
+        {
+            if (!TryGetFromHandle(handle, out var client))
+            {
+                return -1;
+            }
+
+            var request = NodeKeysRegistrationRequest.Parser.ParseFrom(requestBytes.AsReadOnlySpan());
+            client.SecretsCache.Set(Node.GetNodeKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId), request.NodeKeyRawUnlockedData.Span);
+            client.SecretsCache.Set(
+                Node.GetContentKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId),
+                request.ContentKeyRawUnlockedData.Span);
 
             return 0;
         }

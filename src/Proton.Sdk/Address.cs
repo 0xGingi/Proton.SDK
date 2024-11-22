@@ -160,8 +160,8 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
         return addressKeys.Where(x => x.IsPrimary).Select(x => x.PrivateKey).First();
     }
 
-    private static CacheKey GetAddressKeyGroupCacheKey(AddressId id) => new(CacheAddressValueHolderName, id.Value, CacheAddressKeysValueName);
-    private static CacheKey GetAddressKeyCacheKey(AddressKeyId id) => new(CacheAddressKeyValueHolderName, id.Value, CacheAddressKeyDataValueName);
+    internal static CacheKey GetAddressKeyGroupCacheKey(AddressId id) => new(CacheAddressValueHolderName, id.Value, CacheAddressKeysValueName);
+    internal static CacheKey GetAddressKeyCacheKey(AddressKeyId id) => new(CacheAddressKeyValueHolderName, id.Value, CacheAddressKeyDataValueName);
 
     private static ReadOnlyMemory<byte> GetAddressKeyTokenPassphrase(
         PgpArmoredMessage token,

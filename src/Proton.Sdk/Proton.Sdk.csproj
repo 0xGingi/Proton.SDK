@@ -26,6 +26,8 @@
     <InternalsVisibleTo Include="$(AssemblyName).Drive" />
     <InternalsVisibleTo Include="$(AssemblyName).Instrumentation" />
     <InternalsVisibleTo Include="$(AssemblyName).Tests" />
+    <InternalsVisibleTo Include="proton_sdk" />
+    <InternalsVisibleTo Include="libproton_sdk" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 

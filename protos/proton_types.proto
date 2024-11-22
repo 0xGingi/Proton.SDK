@@ -186,6 +186,20 @@ message AddressKeyId {
 
 message AddressKey {
     AddressId address_id = 1;
-    AddressKeyId addressKey_id = 2;
+    AddressKeyId address_key_id = 2;
     bool is_allowed_for_encryption = 3;
+}
+
+// Cryptography
+
+message AddressKeyWithData {
+    AddressKeyId address_key_id = 1;
+    bool is_primary = 2;
+    bool is_allowed_for_encryption = 3;
+    bytes raw_unlocked_data = 4;
+}
+
+message AddressKeyRegistrationRequest {
+    AddressId address_id = 1;
+    repeated AddressKeyWithData keys = 2;
 }
