@@ -14,6 +14,7 @@ public sealed class RevisionReader : IDisposable
     private readonly IRevisionForTransfer _revision;
     private readonly PgpSessionKey _contentKey;
     private readonly RevisionResponse _revisionResponse;
+    private readonly Action<int> _releaseBlockListingAction;
 
     private bool _semaphoreReleased;
 
@@ -22,13 +23,15 @@ public sealed class RevisionReader : IDisposable
         INodeIdentity fileIdentity,
         IRevisionForTransfer revision,
         PgpSessionKey contentKey,
-        RevisionResponse revisionResponse)
+        RevisionResponse revisionResponse,
+        Action<int> releaseBlockListingAction)
     {
         _client = client;
         _fileIdentity = fileIdentity;
         _revision = revision;
         _contentKey = contentKey;
         _revisionResponse = revisionResponse;
+        _releaseBlockListingAction = releaseBlockListingAction;
     }
 
     public async Task<VerificationStatus> ReadAsync(Stream contentOutputStream, Action<long, long> onProgress, CancellationToken cancellationToken)
@@ -47,7 +50,7 @@ public sealed class RevisionReader : IDisposable
             {
                 try
                 {
-                    await foreach (var (block, _) in GetBlocksAsync(_revisionResponse, cancellationToken))
+                    await foreach (var (block, _) in GetBlocksAsync(_revisionResponse, cancellationToken).ConfigureAwait(false))
                     {
                         if (!await _client.BlockDownloader.BlockSemaphore.WaitAsync(0, cancellationToken).ConfigureAwait(false))
                         {
@@ -160,68 +163,75 @@ public sealed class RevisionReader : IDisposable
 
     private async IAsyncEnumerable<(Block Value, bool IsLast)> GetBlocksAsync(RevisionResponse revisionResponse, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var mustTryNextPageOfBlocks = true;
-        var nextExpectedIndex = 1;
-        var outstandingBlock = default(Block);
-        var currentPageBlocks = new List<Block>(BlockPageSize);
-
-        while (mustTryNextPageOfBlocks)
+        try
         {
-            currentPageBlocks.Clear();
+            var mustTryNextPageOfBlocks = true;
+            var nextExpectedIndex = 1;
+            var outstandingBlock = default(Block);
+            var currentPageBlocks = new List<Block>(BlockPageSize);
 
-            var revision = revisionResponse.Revision;
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (revision.Blocks.Count == 0)
+            while (mustTryNextPageOfBlocks)
             {
-                break;
+                currentPageBlocks.Clear();
+
+                var revision = revisionResponse.Revision;
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (revision.Blocks.Count == 0)
+                {
+                    break;
+                }
+
+                mustTryNextPageOfBlocks = revision.Blocks.Count >= BlockPageSize;
+
+                currentPageBlocks.AddRange(revision.Blocks);
+                currentPageBlocks.Sort((a, b) => a.Index.CompareTo(b.Index));
+
+                var blocksExceptLast = currentPageBlocks.Take(currentPageBlocks.Count - 1);
+                var blocksToReturn = outstandingBlock is not null ? blocksExceptLast.Prepend(outstandingBlock) : blocksExceptLast;
+
+                outstandingBlock = currentPageBlocks[^1];
+                var lastKnownIndex = outstandingBlock.Index;
+
+                foreach (var block in blocksToReturn)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (block.Index != nextExpectedIndex)
+                    {
+                        throw new ProtonApiException($"Missing block index {nextExpectedIndex}");
+                    }
+
+                    ++nextExpectedIndex;
+
+                    yield return (block, false);
+                }
+
+                if (mustTryNextPageOfBlocks)
+                {
+                    revisionResponse =
+                        await _client.FilesApi.GetRevisionAsync(
+                            _fileIdentity.ShareId,
+                            _fileIdentity.NodeId,
+                            _revision.RevisionId,
+                            lastKnownIndex + 1,
+                            BlockPageSize,
+                            false,
+                            cancellationToken).ConfigureAwait(false);
+                }
             }
 
-            mustTryNextPageOfBlocks = revision.Blocks.Count >= BlockPageSize;
-
-            currentPageBlocks.AddRange(revision.Blocks);
-            currentPageBlocks.Sort((a, b) => a.Index.CompareTo(b.Index));
-
-            var blocksExceptLast = currentPageBlocks.Take(currentPageBlocks.Count - 1);
-            var blocksToReturn = outstandingBlock is not null ? blocksExceptLast.Prepend(outstandingBlock) : blocksExceptLast;
-
-            outstandingBlock = currentPageBlocks[^1];
-            var lastKnownIndex = outstandingBlock.Index;
-
-            foreach (var block in blocksToReturn)
+            if (outstandingBlock is not null)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (block.Index != nextExpectedIndex)
-                {
-                    throw new ProtonApiException($"Missing block index {nextExpectedIndex}");
-                }
-
-                ++nextExpectedIndex;
-
-                yield return (block, false);
-            }
-
-            if (mustTryNextPageOfBlocks)
-            {
-                revisionResponse =
-                    await _client.FilesApi.GetRevisionAsync(
-                        _fileIdentity.ShareId,
-                        _fileIdentity.NodeId,
-                        _revision.RevisionId,
-                        lastKnownIndex + 1,
-                        BlockPageSize,
-                        false,
-                        cancellationToken).ConfigureAwait(false);
+                yield return (outstandingBlock, true);
             }
         }
-
-        if (outstandingBlock is not null)
+        finally
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            yield return (outstandingBlock, true);
+            _releaseBlockListingAction.Invoke(1);
         }
     }
 

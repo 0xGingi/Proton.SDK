@@ -39,7 +39,7 @@ public sealed class ProtonDriveClient
 
         var maxDegreeOfBlockTransferParallelism = Math.Max(Math.Min(Environment.ProcessorCount / 2, 8), 2);
         var maxDegreeOfBlockProcessingParallelism = maxDegreeOfBlockTransferParallelism + Math.Min(Math.Max(maxDegreeOfBlockTransferParallelism / 2, 2), 4);
-        RevisionBlockListingSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism);
+        BlockListingSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism);
         RevisionCreationSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism);
         BlockUploader = new BlockUploader(this, maxDegreeOfBlockTransferParallelism);
         BlockDownloader = new BlockDownloader(this, maxDegreeOfBlockTransferParallelism);
@@ -65,7 +65,7 @@ public sealed class ProtonDriveClient
 
     internal BlockUploader BlockUploader { get; }
     internal BlockDownloader BlockDownloader { get; }
-    internal FifoFlexibleSemaphore RevisionBlockListingSemaphore { get; }
+    internal FifoFlexibleSemaphore BlockListingSemaphore { get; }
     internal FifoFlexibleSemaphore RevisionCreationSemaphore { get; }
     internal ILogger<ProtonDriveClient> Logger { get; }
 
@@ -123,9 +123,9 @@ public sealed class ProtonDriveClient
 
     public async Task<FileDownloader> WaitForFileDownloaderAsync(CancellationToken cancellationToken)
     {
-        await RevisionBlockListingSemaphore.EnterAsync(1, cancellationToken).ConfigureAwait(false);
+        await BlockListingSemaphore.EnterAsync(1, cancellationToken).ConfigureAwait(false);
 
-        return new FileDownloader(this);
+        return new FileDownloader(this, 1);
     }
 
     public Task<Revision[]> GetFileRevisionsAsync(INodeIdentity fileIdentity, CancellationToken cancellationToken)

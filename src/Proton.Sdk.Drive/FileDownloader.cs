@@ -1,12 +1,14 @@
 ﻿namespace Proton.Sdk.Drive;
 
-public sealed class FileDownloader
+public sealed class FileDownloader : IDisposable
 {
     private readonly ProtonDriveClient _client;
+    private volatile int _remainingNumberOfBlocksToList;
 
-    internal FileDownloader(ProtonDriveClient client)
+    internal FileDownloader(ProtonDriveClient client, int expectedNumberOfBlocks)
     {
         _client = client;
+        _remainingNumberOfBlocksToList = expectedNumberOfBlocks;
     }
 
     public async Task<VerificationStatus> DownloadAsync(
@@ -16,16 +18,10 @@ public sealed class FileDownloader
         Action<long, long> onProgress,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken).ConfigureAwait(false);
+        using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken, ReleaseBlockListing)
+            .ConfigureAwait(false);
 
-            return await revisionReader.ReadAsync(contentOutputStream, onProgress, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            _client.RevisionBlockListingSemaphore.Release(1);
-        }
+        return await revisionReader.ReadAsync(contentOutputStream, onProgress, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<VerificationStatus> DownloadAsync(
@@ -36,20 +32,34 @@ public sealed class FileDownloader
         CancellationToken cancellationToken,
         byte[]? operationId = null)
     {
-        try
-        {
-            using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken, operationId).ConfigureAwait(false);
+        using var revisionReader = await Revision
+            .OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken, ReleaseBlockListing, operationId).ConfigureAwait(false);
 
-            var fileStream = File.Open(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        var fileStream = File.Open(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
 
-            await using (fileStream.ConfigureAwait(false))
-            {
-                return await revisionReader.ReadAsync(fileStream, onProgress, cancellationToken).ConfigureAwait(false);
-            }
-        }
-        finally
+        await using (fileStream.ConfigureAwait(false))
         {
-            _client.RevisionBlockListingSemaphore.Release(1);
+            return await revisionReader.ReadAsync(fileStream, onProgress, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    public void Dispose()
+    {
+        if (_remainingNumberOfBlocksToList == 0)
+        {
+            return;
+        }
+
+        _client.BlockListingSemaphore.Release(_remainingNumberOfBlocksToList);
+        _remainingNumberOfBlocksToList = 0;
+    }
+
+    private void ReleaseBlockListing(int numberOfBlockListings)
+    {
+        var newRemainingNumberOfBlocks = Interlocked.Add(ref _remainingNumberOfBlocksToList, -numberOfBlockListings);
+
+        var amountToRelease = newRemainingNumberOfBlocks >= 0 ? numberOfBlockListings : newRemainingNumberOfBlocks + numberOfBlockListings;
+
+        _client.BlockListingSemaphore.Release(amountToRelease);
     }
 }

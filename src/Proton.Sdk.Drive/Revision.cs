@@ -47,6 +47,7 @@ public sealed partial class Revision : IRevisionForTransfer
             ManifestSignature = ManifestSignature,
             SignatureEmailAddress = SignatureEmailAddress,
         };
+
         revisionMetadata.SamplesSha256Digests.Add(SamplesSha256Digests);
         return revisionMetadata;
     }
@@ -90,6 +91,7 @@ public sealed partial class Revision : IRevisionForTransfer
         INodeIdentity fileIdentity,
         IRevisionForTransfer revisionMetadata,
         CancellationToken cancellationToken,
+        Action<int> releaseBlockListingAction,
         byte[]? operationId = null)
     {
         if (revisionMetadata.State is RevisionState.Draft)
@@ -111,7 +113,7 @@ public sealed partial class Revision : IRevisionForTransfer
 
         await client.BlockDownloader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        return new RevisionReader(client, fileIdentity, revisionMetadata, contentKey, revisionResponse);
+        return new RevisionReader(client, fileIdentity, revisionMetadata, contentKey, revisionResponse, releaseBlockListingAction);
     }
 
     internal static async Task<RevisionWriter> OpenForWritingAsync(
@@ -133,7 +135,8 @@ public sealed partial class Revision : IRevisionForTransfer
         await client.BlockUploader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         const int targetBlockSize = RevisionWriter.DefaultBlockSize;
-        var writer = new RevisionWriter(
+
+        return new RevisionWriter(
             client,
             revisionUploadRequest.ShareMetadata,
             revisionUploadRequest.FileIdentity.NodeId,
@@ -144,7 +147,6 @@ public sealed partial class Revision : IRevisionForTransfer
             releaseBlocksAction,
             targetBlockSize,
             targetBlockSize * 3 / 2);
-        return writer;
     }
 
     internal static async Task DeleteAsync(FilesApiClient filesApi, ShareBasedRevisionIdentity shareBasedRevisionIdentity, CancellationToken cancellationToken)
