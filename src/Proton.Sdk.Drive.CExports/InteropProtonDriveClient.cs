@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Proton.Sdk.CExports;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Instrumentation.CExport;
+using Proton.Sdk.Instrumentation.Provider;
 
 namespace Proton.Sdk.Drive.CExports;
 
@@ -28,7 +29,13 @@ internal static class InteropProtonDriveClient
                 return -1;
             }
 
-            if (!InteropProtonObservabilityService.TryGetFromHandle(observabilityServiceHandle, out var observabilityService))
+            ObservabilityService? observabilityService;
+            if (observabilityServiceHandle == 0)
+            {
+                // Observability should not be used
+                observabilityService = null;
+            }
+            else if (!InteropProtonObservabilityService.TryGetFromHandle(observabilityServiceHandle, out observabilityService))
             {
                 return -1;
             }
@@ -53,7 +60,7 @@ internal static class InteropProtonDriveClient
     }
 
     [UnmanagedCallersOnly(EntryPoint = "drive_client_register_node_keys", CallConvs = [typeof(CallConvCdecl)])]
-    private static int RegisterNodeKeys(nint handle, InteropArray requestBytes)
+    private static int NativeRegisterNodeKeys(nint handle, InteropArray requestBytes)
     {
         try
         {
@@ -82,6 +89,11 @@ internal static class InteropProtonDriveClient
         try
         {
             var gcHandle = GCHandle.FromIntPtr(handle);
+
+            if (gcHandle.Target is not ProtonDriveClient client)
+            {
+                return;
+            }
 
             gcHandle.Free();
         }

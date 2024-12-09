@@ -18,7 +18,7 @@ internal static class InteropProtonObservabilityService
     }
 
     [UnmanagedCallersOnly(EntryPoint = "observability_service_create", CallConvs = [typeof(CallConvCdecl)])]
-    private static unsafe int Create(nint sessionHandle, nint* clientHandle)
+    private static unsafe int NativeCreate(nint sessionHandle, nint* observabilityHandle)
     {
         try
         {
@@ -27,9 +27,9 @@ internal static class InteropProtonObservabilityService
                 return -1;
             }
 
-            var client = new ObservabilityService(session);
+            var observabilityService = new ObservabilityService(session);
 
-            *clientHandle = GCHandle.ToIntPtr(GCHandle.Alloc(client));
+            *observabilityHandle = GCHandle.ToIntPtr(GCHandle.Alloc(observabilityService));
 
             return 0;
         }
@@ -40,7 +40,7 @@ internal static class InteropProtonObservabilityService
     }
 
     [UnmanagedCallersOnly(EntryPoint = "observability_service_start_new", CallConvs = [typeof(CallConvCdecl)])]
-    private static unsafe int CreateAndStart(nint sessionHandle, nint* clientHandle)
+    private static unsafe int NativeCreateAndStart(nint sessionHandle, nint* observabilityHandle)
     {
         try
         {
@@ -49,9 +49,9 @@ internal static class InteropProtonObservabilityService
                 return -1;
             }
 
-            var client = ObservabilityService.StartNew(session);
+            var observabilityService = ObservabilityService.StartNew(session);
 
-            *clientHandle = GCHandle.ToIntPtr(GCHandle.Alloc(client));
+            *observabilityHandle = GCHandle.ToIntPtr(GCHandle.Alloc(observabilityService));
 
             return 0;
         }
@@ -62,11 +62,11 @@ internal static class InteropProtonObservabilityService
     }
 
     [UnmanagedCallersOnly(EntryPoint = "observability_service_start", CallConvs = [typeof(CallConvCdecl)])]
-    private static int Start(nint clientHandle)
+    private static int NativeStart(nint handle)
     {
         try
         {
-            if (!TryGetFromHandle(clientHandle, out var service))
+            if (!TryGetFromHandle(handle, out var service))
             {
                 return -1;
             }
@@ -82,11 +82,11 @@ internal static class InteropProtonObservabilityService
     }
 
     [UnmanagedCallersOnly(EntryPoint = "observability_service_stop", CallConvs = [typeof(CallConvCdecl)])]
-    private static int Stop(nint clientHandle)
+    private static int NativeStop(nint handle)
     {
         try
         {
-            if (!TryGetFromHandle(clientHandle, out var service))
+            if (!TryGetFromHandle(handle, out var service))
             {
                 return -1;
             }
@@ -102,16 +102,16 @@ internal static class InteropProtonObservabilityService
     }
 
     [UnmanagedCallersOnly(EntryPoint = "observability_service_flush", CallConvs = [typeof(CallConvCdecl)])]
-    private static int Flush(nint clientHandle, InteropAsyncCallback callback)
+    private static int NativeFlush(nint handle, InteropAsyncCallback callback)
     {
         try
         {
-            if (!TryGetFromHandle(clientHandle, out var service))
+            if (!TryGetFromHandle(handle, out var service))
             {
                 return -1;
             }
 
-            return callback.InvokeFor(ct => FlushAsync(service, ct));
+            return callback.InvokeFor(ct => InteropFlushAsync(service, ct));
         }
         catch
         {
@@ -119,7 +119,27 @@ internal static class InteropProtonObservabilityService
         }
     }
 
-    private static async ValueTask<Result<InteropArray, InteropArray>> FlushAsync(ObservabilityService service, CancellationToken cancellationToken)
+    [UnmanagedCallersOnly(EntryPoint = "observability_service_free", CallConvs = [typeof(CallConvCdecl)])]
+    private static void NativeFree(nint handle)
+    {
+        try
+        {
+            var gcHandle = GCHandle.FromIntPtr(handle);
+
+            if (gcHandle.Target is not ObservabilityService observabilityService)
+            {
+                return;
+            }
+
+            gcHandle.Free();
+        }
+        catch
+        {
+            // Ignore
+        }
+    }
+
+    private static async ValueTask<Result<InteropArray, InteropArray>> InteropFlushAsync(ObservabilityService service, CancellationToken cancellationToken)
     {
         try
         {
