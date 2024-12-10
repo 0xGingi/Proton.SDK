@@ -203,3 +203,9 @@ message AddressKeyRegistrationRequest {
     AddressId address_id = 1;
     repeated AddressKeyWithData keys = 2;
 }
+
+message KeyCacheMissMessage {
+    string node_id = 1;
+    optional string context_id = 2;
+    string key_type = 3;
+}

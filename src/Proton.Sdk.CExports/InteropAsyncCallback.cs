@@ -26,8 +26,15 @@ internal readonly unsafe struct InteropRequestResponseBodyCallback
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal readonly unsafe struct InteropAsyncCallbackWithProgress
+internal readonly struct InteropAsyncCallbackWithProgress
 {
     public readonly InteropAsyncCallback AsyncCallback;
     public readonly InteropProgressCallback ProgressCallback;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal readonly unsafe struct InteropSecretRequestedCallback
+{
+    public readonly void* State;
+    public readonly delegate* unmanaged[Cdecl]<void*, InteropArray, bool> OnSecretRequested;
 }

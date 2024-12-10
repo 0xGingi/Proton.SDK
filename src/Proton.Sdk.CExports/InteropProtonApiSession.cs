@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using Google.Protobuf;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 
@@ -19,15 +20,21 @@ internal static class InteropProtonApiSession
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_begin", CallConvs = [typeof(CallConvCdecl)])]
-    private static int NativeBegin(
+    private static unsafe int NativeBegin(
         nint unused,
         InteropArray sessionBeginRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
+        InteropSecretRequestedCallback secretRequestedCallback,
         InteropAsyncCallback callback)
     {
         try
         {
-            return callback.InvokeFor(ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, ct));
+            var onSecretRequested = new Func<KeyCacheMissMessage, bool>(
+                keyCacheMissMessage => secretRequestedCallback.OnSecretRequested(
+                    secretRequestedCallback.State,
+                    InteropArray.FromMemory(keyCacheMissMessage.ToByteArray())));
+
+            return callback.InvokeFor(ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, onSecretRequested, ct));
         }
         catch
         {
@@ -39,12 +46,24 @@ internal static class InteropProtonApiSession
     private static unsafe int NativeResume(
         InteropArray sessionResumeRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
+        InteropSecretRequestedCallback secretRequestedCallback,
         nint* sessionHandle)
     {
         try
         {
+            var onSecretRequested = new Func<KeyCacheMissMessage, bool>(
+                keyCacheMissMessage => secretRequestedCallback.OnSecretRequested(
+                    secretRequestedCallback.State,
+                    InteropArray.FromMemory(keyCacheMissMessage.ToByteArray())));
+
             var sessionResumeRequest = SessionResumeRequest.Parser.ParseFrom(sessionResumeRequestBytes.AsReadOnlySpan());
+
             sessionResumeRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
+
+            sessionResumeRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
+                new InMemorySecretsCache(),
+                key => onSecretRequested.Invoke(key.ToCacheMissMessage()));
+
             var session = ProtonApiSession.Resume(sessionResumeRequest);
             *sessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
             return 0;
@@ -180,12 +199,19 @@ internal static class InteropProtonApiSession
     private static async ValueTask<Result<InteropArray, InteropArray>> InteropBeginAsync(
         InteropArray sessionBeginRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
+        Func<KeyCacheMissMessage, bool> onSecretRequested,
         CancellationToken cancellationToken)
     {
         try
         {
             var sessionBeginRequest = SessionBeginRequest.Parser.ParseFrom(sessionBeginRequestBytes.AsReadOnlySpan());
+
             sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
+
+            sessionBeginRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
+                new InMemorySecretsCache(),
+                key => onSecretRequested.Invoke(key.ToCacheMissMessage()));
+
             var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken).ConfigureAwait(false);
 
             var handle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
