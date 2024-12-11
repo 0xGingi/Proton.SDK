@@ -205,7 +205,9 @@ message AddressKeyRegistrationRequest {
 }
 
 message KeyCacheMissMessage {
-    string node_id = 1;
-    optional string context_id = 2;
-    string key_type = 3;
+    string holder_id = 1;
+    string holder_name = 2;
+    optional string context_id = 3;
+    optional string context_name = 4;
+    string value_name = 5;
 }

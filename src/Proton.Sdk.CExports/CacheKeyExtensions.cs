@@ -8,16 +8,19 @@ public static class CacheKeyExtensions
         {
             return new KeyCacheMissMessage
             {
-                NodeId = cacheKey.ValueHolderId,
-                KeyType = cacheKey.ValueName,
+                HolderId = cacheKey.ValueHolderId,
+                HolderName = cacheKey.ValueHolderName,
+                ValueName = cacheKey.ValueName,
             };
         }
 
         return new KeyCacheMissMessage
         {
-            NodeId = cacheKey.ValueHolderId,
+            HolderId = cacheKey.ValueHolderId,
+            HolderName = cacheKey.ValueHolderName,
             ContextId = cacheKey.Context.Value.Id,
-            KeyType = cacheKey.ValueName,
+            ContextName = cacheKey.Context.Value.Name,
+            ValueName = cacheKey.ValueName,
         };
     }
 }

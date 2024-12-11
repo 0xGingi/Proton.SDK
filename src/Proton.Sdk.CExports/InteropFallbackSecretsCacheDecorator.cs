@@ -1,12 +1,15 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Proton.Sdk.Cryptography;
 
 namespace Proton.Sdk.CExports;
 
-internal class InteropFallbackSecretsCacheDecorator(ISecretsCache decoratedInstance, Func<CacheKey, bool> onSecretRequested) : ISecretsCache
+internal class InteropFallbackSecretsCacheDecorator(ISecretsCache decoratedInstance, Func<CacheKey, bool> onSecretRequested, ILoggerFactory? loggerFactory) : ISecretsCache
 {
     private readonly ISecretsCache _decoratedInstance = decoratedInstance;
     private readonly Func<CacheKey, bool> _onSecretRequested = onSecretRequested;
+    private readonly ILogger _logger = loggerFactory is not null ? loggerFactory.CreateLogger<InteropFallbackSecretsCacheDecorator>() : NullLogger.Instance;
 
     public void Set(CacheKey cacheKey, ReadOnlySpan<byte> secretBytes, byte flags, TimeSpan expiration)
     {
@@ -26,6 +29,7 @@ internal class InteropFallbackSecretsCacheDecorator(ISecretsCache decoratedInsta
             var secretAdded = _onSecretRequested.Invoke(cacheKey);
             if (!secretAdded || !_decoratedInstance.TryUse(cacheKey, state, transform, out result))
             {
+                _logger.LogWarning($"Key cache miss for {cacheKey}. It needs to be fetched from the API.");
                 return false;
             }
         }

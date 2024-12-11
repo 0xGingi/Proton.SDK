@@ -248,10 +248,16 @@ message ClientId {
 
 // Cryptography
 
+message ShareKeyRegistrationRequest {
+    StringResponse share_id = 1;
+    bytes share_key_raw_unlocked_data = 2;
+}
+
 message NodeKeysRegistrationRequest {
     NodeIdentity node_identity = 1;
     bytes node_key_raw_unlocked_data = 2;
     optional bytes content_key_raw_unlocked_data = 3;
+    optional bytes hash_key_raw_unlocked_data = 4;
 }
 
 message NodeNameDecryptionRequest {

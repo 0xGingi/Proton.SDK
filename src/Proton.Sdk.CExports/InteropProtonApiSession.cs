@@ -3,7 +3,9 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Google.Protobuf;
+using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
+using Proton.Sdk.CExports.Logging;
 using Proton.Sdk.Cryptography;
 
 namespace Proton.Sdk.CExports;
@@ -58,11 +60,17 @@ internal static class InteropProtonApiSession
 
             var sessionResumeRequest = SessionResumeRequest.Parser.ParseFrom(sessionResumeRequestBytes.AsReadOnlySpan());
 
+            if (InteropLoggerProvider.TryGetFromHandle((nint)sessionResumeRequest.Options.LoggerProviderHandle, out var loggerProvider))
+            {
+                sessionResumeRequest.Options.LoggerFactory = new LoggerFactory([loggerProvider]);
+            }
+
             sessionResumeRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
 
             sessionResumeRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
                 new InMemorySecretsCache(),
-                key => onSecretRequested.Invoke(key.ToCacheMissMessage()));
+                key => onSecretRequested.Invoke(key.ToCacheMissMessage()),
+                sessionResumeRequest.Options.LoggerFactory);
 
             var session = ProtonApiSession.Resume(sessionResumeRequest);
             *sessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
@@ -206,11 +214,17 @@ internal static class InteropProtonApiSession
         {
             var sessionBeginRequest = SessionBeginRequest.Parser.ParseFrom(sessionBeginRequestBytes.AsReadOnlySpan());
 
+            if (InteropLoggerProvider.TryGetFromHandle((nint)sessionBeginRequest.Options.LoggerProviderHandle, out var loggerProvider))
+            {
+                sessionBeginRequest.Options.LoggerFactory = new LoggerFactory([loggerProvider]);
+            }
+
             sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
 
             sessionBeginRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
                 new InMemorySecretsCache(),
-                key => onSecretRequested.Invoke(key.ToCacheMissMessage()));
+                key => onSecretRequested.Invoke(key.ToCacheMissMessage()),
+                sessionBeginRequest.Options.LoggerFactory);
 
             var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken).ConfigureAwait(false);
 

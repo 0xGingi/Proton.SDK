@@ -59,6 +59,28 @@ internal static class InteropProtonDriveClient
         }
     }
 
+    [UnmanagedCallersOnly(EntryPoint = "drive_client_register_share_key", CallConvs = [typeof(CallConvCdecl)])]
+    private static int NativeRegisterShareKey(nint handle, InteropArray requestBytes)
+    {
+        try
+        {
+            if (!TryGetFromHandle(handle, out var client))
+            {
+                return -1;
+            }
+
+            var request = ShareKeyRegistrationRequest.Parser.ParseFrom(requestBytes.AsReadOnlySpan());
+            var shareKeyCacheKey = Share.GetShareKeyCacheKey(new ShareId(request.ShareId.Value));
+            client.SecretsCache.Set(shareKeyCacheKey, request.ShareKeyRawUnlockedData.Span);
+
+            return 0;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
     [UnmanagedCallersOnly(EntryPoint = "drive_client_register_node_keys", CallConvs = [typeof(CallConvCdecl)])]
     private static int NativeRegisterNodeKeys(nint handle, InteropArray requestBytes)
     {
@@ -71,9 +93,20 @@ internal static class InteropProtonDriveClient
 
             var request = NodeKeysRegistrationRequest.Parser.ParseFrom(requestBytes.AsReadOnlySpan());
             client.SecretsCache.Set(Node.GetNodeKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId), request.NodeKeyRawUnlockedData.Span);
-            client.SecretsCache.Set(
-                Node.GetContentKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId),
-                request.ContentKeyRawUnlockedData.Span);
+
+            if (request.ContentKeyRawUnlockedData?.IsEmpty == false)
+            {
+                client.SecretsCache.Set(
+                    Node.GetContentKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId),
+                    request.ContentKeyRawUnlockedData.Span);
+            }
+
+            if (request.HashKeyRawUnlockedData?.IsEmpty == false)
+            {
+                client.SecretsCache.Set(
+                    Node.GetHashKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId),
+                    request.HashKeyRawUnlockedData.Span);
+            }
 
             return 0;
         }
@@ -90,7 +123,7 @@ internal static class InteropProtonDriveClient
         {
             var gcHandle = GCHandle.FromIntPtr(handle);
 
-            if (gcHandle.Target is not ProtonDriveClient client)
+            if (gcHandle.Target is not ProtonDriveClient)
             {
                 return;
             }

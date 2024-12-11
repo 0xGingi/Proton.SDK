@@ -66,5 +66,5 @@ public sealed partial class Share : IShare
         return key;
     }
 
-    private static CacheKey GetShareKeyCacheKey(ShareId shareId) => new(CacheValueHolderName, shareId.Value, CacheShareKeyValueName);
+    internal static CacheKey GetShareKeyCacheKey(ShareId shareId) => new(CacheValueHolderName, shareId.Value, CacheShareKeyValueName);
 }
