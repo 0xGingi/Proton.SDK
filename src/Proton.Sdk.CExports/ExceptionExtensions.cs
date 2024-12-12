@@ -11,10 +11,20 @@ internal static class ExceptionExtensions
     {
         var error = new Error
         {
-            Type = exception.GetType().FullName,
             Message = exception.Message,
-            Context = exception.StackTrace,
         };
+
+        var type = exception.GetType().FullName;
+        if (type is not null)
+        {
+            error.Type = type;
+        }
+
+        var context = exception.StackTrace;
+        if (context is not null)
+        {
+            error.Context = context;
+        }
 
         switch (exception)
         {
