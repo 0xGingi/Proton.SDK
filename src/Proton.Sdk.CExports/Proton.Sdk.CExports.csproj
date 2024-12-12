@@ -4,9 +4,6 @@
     <AssemblyName>proton_sdk</AssemblyName>
     <AssemblyName Condition="'$(RuntimeIdentifier)'=='linux-x64'">libproton_sdk</AssemblyName>
     <AssemblyName Condition="'$(RuntimeIdentifier)'=='linux-arm64'">libproton_sdk</AssemblyName>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>

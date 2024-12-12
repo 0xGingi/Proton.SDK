@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Google.Protobuf;
-using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Files;
@@ -9,7 +8,7 @@ using Proton.Sdk.Drive.Serialization;
 namespace Proton.Sdk.Drive;
 
 public sealed partial class FileNode : INode
-    {
+{
     internal FileNode(
         NodeIdentity nodeIdentity,
         LinkId? parentId,

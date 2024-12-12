@@ -3,9 +3,6 @@
   <PropertyGroup>
     <AssemblyName>libproton_instrumentation_sdk</AssemblyName>
     <AssemblyName Condition="!$(RuntimeIdentifier.StartsWith('linux')) And !$(RuntimeIdentifier.StartsWith('android'))">proton_instrumentation_sdk</AssemblyName>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
