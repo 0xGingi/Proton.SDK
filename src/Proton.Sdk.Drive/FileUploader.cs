@@ -157,7 +157,7 @@ public sealed class FileUploader : IFileUploader
 
     public void Dispose()
     {
-        if (_remainingNumberOfBlocks == 0)
+        if (_remainingNumberOfBlocks <= 0)
         {
             return;
         }
@@ -193,7 +193,7 @@ public sealed class FileUploader : IFileUploader
     {
         var newRemainingNumberOfBlocks = Interlocked.Add(ref _remainingNumberOfBlocks, -numberOfBlocks);
 
-        var amountToRelease = newRemainingNumberOfBlocks >= 0 ? numberOfBlocks : newRemainingNumberOfBlocks + numberOfBlocks;
+        var amountToRelease = Math.Max(newRemainingNumberOfBlocks >= 0 ? numberOfBlocks : newRemainingNumberOfBlocks + numberOfBlocks, 0);
 
         _client.RevisionCreationSemaphore.Release(amountToRelease);
     }

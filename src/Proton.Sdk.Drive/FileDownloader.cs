@@ -45,7 +45,7 @@ public sealed class FileDownloader : IDisposable
 
     public void Dispose()
     {
-        if (_remainingNumberOfBlocksToList == 0)
+        if (_remainingNumberOfBlocksToList <= 0)
         {
             return;
         }
@@ -58,7 +58,7 @@ public sealed class FileDownloader : IDisposable
     {
         var newRemainingNumberOfBlocks = Interlocked.Add(ref _remainingNumberOfBlocksToList, -numberOfBlockListings);
 
-        var amountToRelease = newRemainingNumberOfBlocks >= 0 ? numberOfBlockListings : newRemainingNumberOfBlocks + numberOfBlockListings;
+        var amountToRelease = Math.Max(newRemainingNumberOfBlocks >= 0 ? numberOfBlockListings : newRemainingNumberOfBlocks + numberOfBlockListings, 0);
 
         _client.BlockListingSemaphore.Release(amountToRelease);
     }
