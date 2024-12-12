@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Google.Protobuf;
-using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Files;
@@ -316,7 +315,7 @@ public partial class Node : INode
         out ArraySegment<byte> nameHashDigest)
     {
         var maxNameByteLength = Encoding.UTF8.GetByteCount(name);
-        var nameBytes = MemoryProvider.GetHeapMemoryIfTooLargeForStack(maxNameByteLength, out var nameHeapMemoryOwner)
+        var nameBytes = MemoryProvider.GetHeapMemoryIfTooLargeForStack<byte>(maxNameByteLength, out var nameHeapMemoryOwner)
             ? nameHeapMemoryOwner.Memory.Span
             : stackalloc byte[maxNameByteLength];
 

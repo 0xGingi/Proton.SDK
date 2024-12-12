@@ -23,6 +23,7 @@ internal sealed class Link
     public string? NameSignatureEmailAddress { get; init; }
 
     [JsonPropertyName("Hash")]
+    [JsonConverter(typeof(ForgivingBytesToHexJsonConverter))]
     public required ReadOnlyMemory<byte> NameHashDigest { get; init; }
 
     public required LinkState State { get; init; }
