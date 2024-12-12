@@ -1,5 +1,4 @@
-﻿using System.Buffers.Text;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Google.Protobuf;
@@ -11,10 +10,8 @@ using Proton.Sdk.Drive.Serialization;
 
 namespace Proton.Sdk.Drive;
 
-public partial class Node : INode
+public class Node : INode
 {
-    private const int PassphraseRandomBytesLength = 32;
-
     private const string CacheContextName = "drive.volume";
     private const string CacheValueHolderName = "node";
     private const string CacheNodeKeyValueName = "key";
@@ -78,20 +75,23 @@ public partial class Node : INode
     {
         using var signingKey = await client.Account.GetAddressPrimaryKeyAsync(destinationShare.MembershipAddressId, cancellationToken).ConfigureAwait(false);
         var nodeIdentity = new NodeIdentity { ShareId = shareId, VolumeId = node.NodeIdentity.VolumeId, NodeId = node.NodeIdentity.NodeId };
-        var destinationNodeIdentity = new NodeIdentity { ShareId = shareId, VolumeId = destinationFolderIdentity.VolumeId, NodeId = destinationFolderIdentity.NodeId };
+        var destinationNodeIdentity = new NodeIdentity
+        {
+            ShareId = shareId,
+            VolumeId = destinationFolderIdentity.VolumeId,
+            NodeId = destinationFolderIdentity.NodeId,
+        };
 
         using var nameSessionKey = await GetNameSessionKeyAsync(client, nodeIdentity, cancellationToken).ConfigureAwait(false);
 
-        using var passphraseSessionKey =
-            await GetPassphraseSessionKeyAsync(client, nodeIdentity, cancellationToken).ConfigureAwait(false);
+        using var passphraseSessionKey = await GetPassphraseSessionKeyAsync(client, nodeIdentity, cancellationToken).ConfigureAwait(false);
 
         using var destinationFolderKey = await GetKeyAsync(
             client,
             destinationNodeIdentity,
             cancellationToken).ConfigureAwait(false);
 
-        var destinationFolderHashKey = await GetHashKeyAsync(client, destinationFolderIdentity, cancellationToken)
-            .ConfigureAwait(false);
+        var destinationFolderHashKey = await GetHashKeyAsync(client, destinationFolderIdentity, cancellationToken).ConfigureAwait(false);
 
         GetNameParameters(
             nameAtDestination,
@@ -156,11 +156,13 @@ public partial class Node : INode
         CancellationToken cancellationToken,
         byte[]? operationId = null)
     {
-        if (!client.SecretsCache.TryUse(GetNodeKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => PgpPrivateKey.Import(data), out var key))
+        var cacheKey = GetNodeKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId);
+
+        if (!client.SecretsCache.TryUse(cacheKey, (data, _) => PgpPrivateKey.Import(data), out var key))
         {
             await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken, operationId).ConfigureAwait(false);
 
-            if (!client.SecretsCache.TryUse(GetNodeKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => PgpPrivateKey.Import(data), out key))
+            if (!client.SecretsCache.TryUse(cacheKey, (data, _) => PgpPrivateKey.Import(data), out key))
             {
                 throw new ProtonApiException($"Could not get node key for {nodeIdentity.NodeId}");
             }
@@ -201,11 +203,8 @@ public partial class Node : INode
         key = PgpPrivateKey.Generate("Drive key", "no-reply@proton.me", KeyGenerationAlgorithm.Default);
         nameSessionKey = PgpSessionKey.Generate();
 
-        Span<byte> passphrase = stackalloc byte[Base64.GetMaxEncodedToUtf8Length(PassphraseRandomBytesLength)];
-        var passphraseRandomBytes = passphrase[..PassphraseRandomBytesLength];
-        RandomNumberGenerator.Fill(passphraseRandomBytes);
-        Base64.EncodeToUtf8InPlace(passphrase, PassphraseRandomBytesLength, out var passphraseLength);
-        passphrase = passphrase[..passphraseLength];
+        Span<byte> passphraseBuffer = stackalloc byte[Share.PassphraseMaxUtf8Length];
+        var passphrase = Share.GeneratePassphrase(passphraseBuffer);
 
         passphraseSessionKey = PgpSessionKey.Generate();
         var passphraseEncryptionSecrets = new EncryptionSecrets(parentFolderKey, passphraseSessionKey);
@@ -269,10 +268,8 @@ public partial class Node : INode
         secretsCache.Set(GetContentKeyCacheKey(volumeId, linkId), contentKey.Export().Token);
 
         var extendedAttributes = link.ExtendedAttributes is not null
-            ?
-            JsonSerializer.Deserialize(key.Decrypt(link.ExtendedAttributes.Value), ProtonDriveApiSerializerContext.Default.ExtendedAttributes)
-            :
-            default;
+            ? JsonSerializer.Deserialize(key.Decrypt(link.ExtendedAttributes.Value), ProtonDriveApiSerializerContext.Default.ExtendedAttributes)
+            : default;
 
         var activeRevisionDto = fileProperties.ActiveRevision is not null
             ? (fileProperties.ActiveRevision, extendedAttributes)
@@ -292,11 +289,13 @@ public partial class Node : INode
         INodeIdentity nodeIdentity,
         CancellationToken cancellationToken)
     {
-        if (!client.SecretsCache.TryUse(GetHashKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => data.ToArray().AsMemory(), out var hashKey))
+        var cacheKey = GetHashKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId);
+
+        if (!client.SecretsCache.TryUse(cacheKey, (data, _) => data.ToArray().AsMemory(), out var hashKey))
         {
             await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
-            if (!client.SecretsCache.TryUse(GetHashKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId), (data, _) => data.ToArray().AsMemory(), out hashKey))
+            if (!client.SecretsCache.TryUse(cacheKey, (data, _) => data.ToArray().AsMemory(), out hashKey))
             {
                 throw new ProtonApiException($"Could not get hash key for {nodeIdentity.NodeId}");
             }
@@ -387,17 +386,13 @@ public partial class Node : INode
         NodeIdentity nodeIdentity,
         CancellationToken cancellationToken)
     {
-        if (!client.SecretsCache.TryUse(
-            GetNameSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
-            (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
-            out var nameKey))
+        var cacheKey = GetNameSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId);
+
+        if (!client.SecretsCache.TryUse(cacheKey, (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256), out var nameKey))
         {
             await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
-            if (!client.SecretsCache.TryUse(
-                GetNameSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
-                (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
-                out nameKey))
+            if (!client.SecretsCache.TryUse(cacheKey, (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256), out nameKey))
             {
                 throw new ProtonApiException($"Could not get name session key for {nodeIdentity.NodeId}");
             }
@@ -411,17 +406,13 @@ public partial class Node : INode
         NodeIdentity nodeIdentity,
         CancellationToken cancellationToken)
     {
-        if (!client.SecretsCache.TryUse(
-            GetPassphraseSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
-            (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
-            out var passphraseKey))
+        var cacheKey = GetPassphraseSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId);
+
+        if (!client.SecretsCache.TryUse(cacheKey, (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256), out var passphraseKey))
         {
             await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
-            if (!client.SecretsCache.TryUse(
-                GetPassphraseSessionKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
-                (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
-                out passphraseKey))
+            if (!client.SecretsCache.TryUse(cacheKey, (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256), out passphraseKey))
             {
                 throw new ProtonApiException($"Could not get passphrase session key for {nodeIdentity.NodeId}");
             }

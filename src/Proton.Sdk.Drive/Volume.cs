@@ -43,19 +43,22 @@ public sealed class Volume(VolumeId id, ShareId rootShareId, VolumeState state, 
     {
         const string folderName = "root";
 
-        var shareKeyPassphrase = RandomNumberGenerator.GetBytes(32);
+        Span<byte> shareKeyPassphraseBuffer = stackalloc byte[Share.PassphraseMaxUtf8Length];
+        var shareKeyPassphrase = Share.GeneratePassphrase(shareKeyPassphraseBuffer);
         var shareKey = PgpPrivateKey.Generate("Drive key", "no-reply@proton.me", KeyGenerationAlgorithm.Default);
         using var lockedShareKey = shareKey.Lock(shareKeyPassphrase);
 
         var encryptedShareKeyPassphrase = addressKey.EncryptAndSign(shareKeyPassphrase, addressKey, out var shareKeyPassphraseSignature);
 
-        var folderKeyPassphrase = RandomNumberGenerator.GetBytes(32);
+        Span<byte> folderKeyPassphraseBuffer = stackalloc byte[Share.PassphraseMaxUtf8Length];
+        var folderKeyPassphrase = Share.GeneratePassphrase(folderKeyPassphraseBuffer);
         var folderKey = PgpPrivateKey.Generate("Drive key", "no-reply@proton.me", KeyGenerationAlgorithm.Default);
         using var lockedFolderKey = folderKey.Lock(folderKeyPassphrase);
 
         var encryptedFolderKeyPassphrase = shareKey.EncryptAndSign(folderKeyPassphrase, addressKey, out var folderKeyPassphraseSignature);
 
-        var folderHashKey = RandomNumberGenerator.GetBytes(32);
+        Span<byte> folderHashKey = stackalloc byte[32];
+        RandomNumberGenerator.Fill(folderHashKey);
 
         return new VolumeCreationParameters
         {
@@ -63,11 +66,11 @@ public sealed class Volume(VolumeId id, ShareId rootShareId, VolumeState state, 
             ShareKey = lockedShareKey.ToBytes(),
             ShareKeyPassphrase = encryptedShareKeyPassphrase,
             ShareKeyPassphraseSignature = shareKeyPassphraseSignature,
-            FolderName = shareKey.EncryptText(folderName),
+            FolderName = shareKey.EncryptAndSignText(folderName, addressKey),
             FolderKey = lockedFolderKey.ToBytes(),
             FolderKeyPassphrase = encryptedFolderKeyPassphrase,
             FolderKeyPassphraseSignature = folderKeyPassphraseSignature,
-            FolderHashKey = folderKey.Encrypt(folderHashKey),
+            FolderHashKey = folderKey.EncryptAndSign(folderHashKey, addressKey),
         };
     }
 }
