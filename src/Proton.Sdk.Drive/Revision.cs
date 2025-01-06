@@ -1,5 +1,6 @@
 using Google.Protobuf;
 using Google.Protobuf.Collections;
+using Microsoft.Extensions.Logging;
 using Proton.Sdk.Drive.Files;
 
 namespace Proton.Sdk.Drive;
@@ -56,20 +57,21 @@ public sealed partial class Revision : IRevisionForTransfer
         ProtonDriveClient client,
         IShareForCommand share,
         INodeIdentity file,
-        RevisionId knownLastRevisionId,
+        RevisionId? knownLastRevisionId,
         CancellationToken cancellationToken,
         byte[]? operationId = null)
     {
         var parameters = new RevisionCreationParameters
         {
-            CurrentRevisionId = knownLastRevisionId.Value,
+            CurrentRevisionId = knownLastRevisionId?.Value,
             ClientId = client.ClientId,
         };
 
         RevisionId revisionId;
         try
         {
-            var revisionResponse = await client.FilesApi.CreateRevisionAsync(share.ShareId, file.NodeId, parameters, cancellationToken, operationId).ConfigureAwait(false);
+            var revisionResponse = await client.FilesApi.CreateRevisionAsync(share.ShareId, file.NodeId, parameters, cancellationToken, operationId)
+                .ConfigureAwait(false);
 
             revisionId = new RevisionId(revisionResponse.Identity.RevisionId);
         }

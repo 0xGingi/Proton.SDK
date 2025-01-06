@@ -69,9 +69,14 @@ internal static class InteropCancellationTokenSource
                 return;
             }
 
-            gcHandle.Free();
-
-            cancellationTokenSource.Dispose();
+            try
+            {
+                cancellationTokenSource.Dispose();
+            }
+            finally
+            {
+                gcHandle.Free();
+            }
         }
         catch
         {

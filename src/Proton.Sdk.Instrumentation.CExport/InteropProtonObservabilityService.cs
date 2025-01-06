@@ -126,7 +126,7 @@ internal static class InteropProtonObservabilityService
         {
             var gcHandle = GCHandle.FromIntPtr(handle);
 
-            if (gcHandle.Target is not ObservabilityService observabilityService)
+            if (gcHandle.Target is not ObservabilityService)
             {
                 return;
             }

@@ -65,7 +65,8 @@ internal static class InteropProtonApiSession
                 sessionResumeRequest.Options.LoggerFactory = new LoggerFactory([loggerProvider]);
             }
 
-            sessionResumeRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
+            sessionResumeRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(
+                requestResponseBodyCallback);
 
             sessionResumeRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
                 new InMemorySecretsCache(),
@@ -196,6 +197,11 @@ internal static class InteropProtonApiSession
         {
             var gcHandle = GCHandle.FromIntPtr(handle);
 
+            if (gcHandle.Target is not ProtonApiSession)
+            {
+                return;
+            }
+
             gcHandle.Free();
         }
         catch
@@ -219,7 +225,8 @@ internal static class InteropProtonApiSession
                 sessionBeginRequest.Options.LoggerFactory = new LoggerFactory([loggerProvider]);
             }
 
-            sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
+            sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(
+                requestResponseBodyCallback);
 
             sessionBeginRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
                 new InMemorySecretsCache(),

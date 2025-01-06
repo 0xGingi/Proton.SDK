@@ -135,7 +135,16 @@ internal static class InteropFileUploader
                 ? new[] { new FileSample(FileSampleType.Thumbnail, new ArraySegment<byte>(fileUploadRequest.Thumbnail.ToByteArray())) }
                 : [];
 
-            var fileStream = File.OpenRead(fileUploadRequest.SourceFilePath);
+            FileStream fileStream;
+            try
+            {
+                fileStream = File.OpenRead(fileUploadRequest.SourceFilePath);
+            }
+            catch
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
+            }
 
             await using (fileStream)
             {
@@ -174,14 +183,23 @@ internal static class InteropFileUploader
                 ? new[] { new FileSample(FileSampleType.Thumbnail, new ArraySegment<byte>(revisionUploadRequest.Thumbnail.ToByteArray())) }
                 : [];
 
-            var fileStream = File.OpenRead(revisionUploadRequest.SourceFilePath);
+            FileStream fileStream;
+            try
+            {
+                fileStream = File.OpenRead(revisionUploadRequest.SourceFilePath);
+            }
+            catch
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
+            }
 
             await using (fileStream)
             {
                 var response = await uploader.UploadNewRevisionAsync(
                     revisionUploadRequest.ShareMetadata,
                     revisionUploadRequest.FileIdentity,
-                    revisionUploadRequest.RevisionMetadata.RevisionId,
+                    revisionUploadRequest.RevisionMetadata?.RevisionId,
                     fileStream,
                     samples,
                     DateTimeOffset.FromUnixTimeSeconds(revisionUploadRequest.LastModificationDate),

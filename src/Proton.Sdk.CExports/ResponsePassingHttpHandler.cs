@@ -23,6 +23,7 @@ public sealed class ResponsePassingHttpHandler(Action<byte[], HttpMethod, Uri?, 
             ? await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)
             : string.Empty;
         var responseBody = await message.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
         passResponse(
             operationId,
             request.Method,

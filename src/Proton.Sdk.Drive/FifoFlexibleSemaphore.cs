@@ -1,26 +1,32 @@
-﻿namespace Proton.Sdk.Drive;
+﻿using Microsoft.Extensions.Logging;
+
+namespace Proton.Sdk.Drive;
 
 /// <summary>
 /// Acts as a semaphore that acts in a first in / first out manner, can increment and decrement its count by more than 1, and can be entered as long as the count before the increment is less than the maximum.
 /// </summary>
 internal sealed class FifoFlexibleSemaphore
 {
+    private readonly ILogger _logger;
     private readonly int _maximumCount;
     private readonly Queue<(int Increment, TaskCompletionSource TaskCompletionSource)> _waitingQueue = new();
 
     private int _currentCount;
 
-    public FifoFlexibleSemaphore(int maximumCount)
+    public FifoFlexibleSemaphore(int maximumCount, ILogger logger)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCount, nameof(maximumCount));
 
         _maximumCount = maximumCount;
         _currentCount = 0;
+        _logger = logger;
     }
 
     public ValueTask EnterAsync(int increment, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(increment, nameof(increment));
+
+        _logger.LogTrace($"FifoFlexibleSemaphore.EnterAsync called with {nameof(increment)} {{Increment}}", increment);
 
         TaskCompletionSource tcs;
         lock (_waitingQueue)
@@ -57,6 +63,8 @@ internal sealed class FifoFlexibleSemaphore
     public void Release(int decrement)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(decrement, nameof(decrement));
+
+        _logger.LogTrace($"FifoFlexibleSemaphore.Release called with {nameof(decrement)} {{Decrement}}", decrement);
 
         lock (_waitingQueue)
         {

@@ -1,4 +1,7 @@
-﻿namespace Proton.Sdk.Drive;
+﻿using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+
+namespace Proton.Sdk.Drive;
 
 public sealed class FileDownloader : IDisposable
 {
@@ -10,6 +13,8 @@ public sealed class FileDownloader : IDisposable
         _client = client;
         _remainingNumberOfBlocksToList = expectedNumberOfBlocks;
     }
+
+    internal ILogger Logger => _client.Logger;
 
     public async Task<VerificationStatus> DownloadAsync(
         INodeIdentity fileIdentity,
@@ -35,7 +40,16 @@ public sealed class FileDownloader : IDisposable
         using var revisionReader = await Revision
             .OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken, ReleaseBlockListing, operationId).ConfigureAwait(false);
 
-        var fileStream = File.Open(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        FileStream fileStream;
+        try
+        {
+            fileStream = File.Open(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        }
+        catch
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw;
+        }
 
         await using (fileStream.ConfigureAwait(false))
         {

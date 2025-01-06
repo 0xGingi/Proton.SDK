@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Proton.Sdk.Drive.Files;
 
 namespace Proton.Sdk.Drive;
@@ -12,6 +13,8 @@ public sealed class FileUploader : IFileUploader
         _client = client;
         _remainingNumberOfBlocks = expectedNumberOfBlocks;
     }
+
+    public ILogger Logger => _client.Logger;
 
     public async Task<FileNode> UploadNewFileOrRevisionAsync(
         ShareMetadata shareMetadata,
@@ -125,7 +128,7 @@ public sealed class FileUploader : IFileUploader
     public async Task<Revision> UploadNewRevisionAsync(
         ShareMetadata shareMetadata,
         NodeIdentity fileIdentity,
-        RevisionId lastKnownRevisionId,
+        RevisionId? lastKnownRevisionId,
         Stream contentInputStream,
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,
@@ -177,14 +180,14 @@ public sealed class FileUploader : IFileUploader
         CancellationToken cancellationToken,
         byte[]? operationId = null)
     {
-        var fileUploadRequest = new RevisionUploadRequest
+        var revisionUploadRequest = new RevisionUploadRequest
         {
             FileIdentity = fileIdentity,
             ShareMetadata = shareMetadata,
             RevisionMetadata = revision.Metadata(),
         };
 
-        using var revisionWriter = await Revision.OpenForWritingAsync(_client, fileUploadRequest, ReleaseBlocks, cancellationToken, operationId).ConfigureAwait(false);
+        using var revisionWriter = await Revision.OpenForWritingAsync(_client, revisionUploadRequest, ReleaseBlocks, cancellationToken, operationId).ConfigureAwait(false);
 
         await revisionWriter.WriteAsync(contentInputStream, samples, lastModificationTime, onProgress, cancellationToken, operationId).ConfigureAwait(false);
     }

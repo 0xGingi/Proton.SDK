@@ -65,7 +65,14 @@ internal static class InteropFileDownloader
                 return;
             }
 
-            gcHandle.Free();
+            try
+            {
+                fileDownloader.Dispose();
+            }
+            finally
+            {
+                gcHandle.Free();
+            }
         }
         catch
         {
@@ -100,7 +107,7 @@ internal static class InteropFileDownloader
         {
             var fileDownloadRequest = FileDownloadRequest.Parser.ParseFrom(fileDownloadRequestBytes.AsReadOnlySpan());
 
-            var response = await downloader.DownloadAsync(
+            var verificationStatus = await downloader.DownloadAsync(
                 fileDownloadRequest.FileIdentity,
                 fileDownloadRequest.RevisionMetadata,
                 fileDownloadRequest.TargetFilePath,
@@ -108,7 +115,7 @@ internal static class InteropFileDownloader
                 cancellationToken,
                 fileDownloadRequest.OperationId.ToByteArray()).ConfigureAwait(false);
 
-            return ResultExtensions.Success(new IntResponse { Value = 0 });
+            return ResultExtensions.Success(new VerificationStatusResponse { VerificationStatus = verificationStatus });
         }
         catch (Exception e)
         {

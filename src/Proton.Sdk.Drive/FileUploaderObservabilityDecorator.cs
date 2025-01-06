@@ -1,4 +1,5 @@
-﻿using Proton.Sdk.Drive.Instrumentation;
+﻿using Microsoft.Extensions.Logging;
+using Proton.Sdk.Drive.Instrumentation;
 
 namespace Proton.Sdk.Drive;
 
@@ -14,6 +15,8 @@ public sealed class FileUploaderObservabilityDecorator : IFileUploader
         _decoratedInstance = decoratedInstance;
         _uploadAttemptRetryMonitor = uploadAttemptRetryMonitor;
     }
+
+    public ILogger Logger => _decoratedInstance.Logger;
 
     public async Task<FileNode> UploadNewFileOrRevisionAsync(
         ShareMetadata shareMetadata,
@@ -87,7 +90,7 @@ public sealed class FileUploaderObservabilityDecorator : IFileUploader
     public async Task<Revision> UploadNewRevisionAsync(
         ShareMetadata shareMetadata,
         NodeIdentity fileIdentity,
-        RevisionId lastKnownRevisionId,
+        RevisionId? lastKnownRevisionId,
         Stream contentInputStream,
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,

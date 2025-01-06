@@ -37,14 +37,18 @@ public sealed class ProtonDriveClient
         Account = new ProtonAccountClient(session);
         SecretsCache = session.SecretsCache;
 
+        Logger = session.LoggerFactory.CreateLogger<ProtonDriveClient>();
+
         var maxDegreeOfBlockTransferParallelism = Math.Max(Math.Min(Environment.ProcessorCount / 2, 8), 2);
         var maxDegreeOfBlockProcessingParallelism = maxDegreeOfBlockTransferParallelism + Math.Min(Math.Max(maxDegreeOfBlockTransferParallelism / 2, 2), 4);
-        BlockListingSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism);
-        RevisionCreationSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism);
+
+        Logger.LogDebug($"ProtonDriveClient initialization: {nameof(maxDegreeOfBlockProcessingParallelism)} {{MaxDegreeOfBlockProcessingParallelism}}", maxDegreeOfBlockProcessingParallelism);
+        Logger.LogDebug($"ProtonDriveClient initialization: {nameof(maxDegreeOfBlockTransferParallelism)} {{MaxDegreeOfBlockTransferParallelism}}", maxDegreeOfBlockTransferParallelism);
+
+        BlockListingSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism, Logger);
+        RevisionCreationSemaphore = new FifoFlexibleSemaphore(maxDegreeOfBlockProcessingParallelism, Logger);
         BlockUploader = new BlockUploader(this, maxDegreeOfBlockTransferParallelism);
         BlockDownloader = new BlockDownloader(this, maxDegreeOfBlockTransferParallelism);
-
-        Logger = session.LoggerFactory.CreateLogger<ProtonDriveClient>();
     }
 
     public string ClientId { get; }

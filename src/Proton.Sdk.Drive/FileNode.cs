@@ -105,6 +105,16 @@ public sealed partial class FileNode : INode
 
             createdNodeId = new LinkId(ex.Response.Conflict.LinkId);
             createdRevisionId = new RevisionId(ex.Response.Conflict.DraftRevisionId);
+
+            if (operationId is not null)
+            {
+                await Node.GetAsync(
+                    client,
+                    fileUploadRequest.ShareMetadata.ShareId,
+                    createdNodeId,
+                    cancellationToken,
+                    operationId).ConfigureAwait(false);
+            }
         }
 
         var file = new FileNode

@@ -1,7 +1,11 @@
-﻿namespace Proton.Sdk.Drive;
+﻿using Microsoft.Extensions.Logging;
+
+namespace Proton.Sdk.Drive;
 
 public interface IFileUploader : IDisposable
 {
+    public ILogger Logger { get; }
+
     public Task<FileNode> UploadNewFileOrRevisionAsync(
         ShareMetadata shareMetadata,
         NodeIdentity parentFolderIdentity,
@@ -29,7 +33,7 @@ public interface IFileUploader : IDisposable
     public Task<Revision> UploadNewRevisionAsync(
         ShareMetadata shareMetadata,
         NodeIdentity fileIdentity,
-        RevisionId lastKnownRevisionId,
+        RevisionId? lastKnownRevisionId,
         Stream contentInputStream,
         IEnumerable<FileSample> samples,
         DateTimeOffset? lastModificationTime,

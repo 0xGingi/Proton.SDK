@@ -184,7 +184,7 @@ message FileUploadResponse {
 message RevisionUploadRequest {
     NodeIdentity file_identity = 1;
     ShareMetadata share_metadata = 2;
-    RevisionMetadata revision_metadata = 3;
+    optional RevisionMetadata revision_metadata = 3;
     optional bytes thumbnail = 4;
     int64 last_modification_date = 5;
     string source_file_path = 6; // Do we need this?
