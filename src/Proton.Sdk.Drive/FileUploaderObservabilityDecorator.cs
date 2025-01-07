@@ -3,17 +3,17 @@ using Proton.Sdk.Drive.Instrumentation;
 
 namespace Proton.Sdk.Drive;
 
-public sealed class FileUploaderObservabilityDecorator : IFileUploader
+internal sealed class FileUploaderObservabilityDecorator : IFileUploader
 {
     private readonly FileUploader _decoratedInstance;
-    private readonly UploadAttemptRetryMonitor _uploadAttemptRetryMonitor;
+    private readonly UploadAttemptRetryMonitor _attemptRetryMonitor;
 
     internal FileUploaderObservabilityDecorator(
         FileUploader decoratedInstance,
-        UploadAttemptRetryMonitor uploadAttemptRetryMonitor)
+        UploadAttemptRetryMonitor attemptRetryMonitor)
     {
         _decoratedInstance = decoratedInstance;
-        _uploadAttemptRetryMonitor = uploadAttemptRetryMonitor;
+        _attemptRetryMonitor = attemptRetryMonitor;
     }
 
     public ILogger Logger => _decoratedInstance.Logger;
@@ -44,7 +44,7 @@ public sealed class FileUploaderObservabilityDecorator : IFileUploader
                 cancellationToken,
                 operationId).ConfigureAwait(false);
 
-            _uploadAttemptRetryMonitor.IncrementSuccess(parentFolderIdentity.VolumeId, parentFolderIdentity.NodeId, name);
+            _attemptRetryMonitor.IncrementSuccess(parentFolderIdentity.VolumeId, parentFolderIdentity.NodeId, name);
 
             return file;
         }
@@ -55,7 +55,7 @@ public sealed class FileUploaderObservabilityDecorator : IFileUploader
                 or ResponseCode.MaxFileSizeForFreeUser
                 or ResponseCode.TooManyChildren))
             {
-                _uploadAttemptRetryMonitor.IncrementFailure(parentFolderIdentity.VolumeId, parentFolderIdentity.NodeId, name);
+                _attemptRetryMonitor.IncrementFailure(parentFolderIdentity.VolumeId, parentFolderIdentity.NodeId, name);
             }
 
             throw;

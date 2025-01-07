@@ -8,7 +8,7 @@ namespace Proton.Sdk.Drive.CExports;
 
 internal static class InteropFileDownloader
 {
-    private static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out FileDownloader downloader)
+    private static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out IFileDownloader downloader)
     {
         if (handle == 0)
         {
@@ -18,7 +18,7 @@ internal static class InteropFileDownloader
 
         var gcHandle = GCHandle.FromIntPtr(handle);
 
-        downloader = gcHandle.Target as FileDownloader;
+        downloader = gcHandle.Target as IFileDownloader;
 
         return downloader is not null;
     }
@@ -66,7 +66,7 @@ internal static class InteropFileDownloader
         {
             var gcHandle = GCHandle.FromIntPtr(downloaderHandle);
 
-            if (gcHandle.Target is not FileDownloader fileDownloader)
+            if (gcHandle.Target is not IFileDownloader fileDownloader)
             {
                 return;
             }
@@ -104,7 +104,7 @@ internal static class InteropFileDownloader
     }
 
     private static async ValueTask<Result<InteropArray, InteropArray>> InteropDownloadFileAsync(
-        FileDownloader downloader,
+        IFileDownloader downloader,
         InteropArray fileDownloadRequestBytes,
         InteropProgressCallback progressCallback,
         CancellationToken cancellationToken)

@@ -1,9 +1,8 @@
-﻿using System.Diagnostics;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 
 namespace Proton.Sdk.Drive;
 
-public sealed class FileDownloader : IDisposable
+internal sealed class FileDownloader : IFileDownloader
 {
     private readonly ProtonDriveClient _client;
     private volatile int _remainingNumberOfBlocksToList;
@@ -23,7 +22,7 @@ public sealed class FileDownloader : IDisposable
         Action<long, long> onProgress,
         CancellationToken cancellationToken)
     {
-        using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken, ReleaseBlockListing)
+        using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, ReleaseBlockListing, cancellationToken)
             .ConfigureAwait(false);
 
         return await revisionReader.ReadAsync(contentOutputStream, onProgress, cancellationToken).ConfigureAwait(false);
@@ -37,8 +36,8 @@ public sealed class FileDownloader : IDisposable
         CancellationToken cancellationToken,
         byte[]? operationId = null)
     {
-        using var revisionReader = await Revision
-            .OpenForReadingAsync(_client, fileIdentity, revision, cancellationToken, ReleaseBlockListing, operationId).ConfigureAwait(false);
+        using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, ReleaseBlockListing, cancellationToken, operationId)
+            .ConfigureAwait(false);
 
         FileStream fileStream;
         try

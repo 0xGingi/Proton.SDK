@@ -18,6 +18,7 @@ public sealed class ProtonDriveClient
     private readonly HttpClient _defaultHttpClient;
     private readonly HttpClient _storageHttpClient;
     private readonly UploadAttemptRetryMonitor? _uploadAttemptRetryMonitor;
+    private readonly DownloadAttemptRetryMonitor? _downloadAttemptRetryMonitor;
 
     /// <summary>
     /// Creates a new instance of <see cref="ProtonDriveClient"/>.
@@ -28,9 +29,12 @@ public sealed class ProtonDriveClient
     {
         _defaultHttpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute, TimeSpan.FromSeconds(15));
         _storageHttpClient = session.GetHttpClient(ProtonDriveDefaults.DriveBaseRoute, TimeSpan.FromMinutes(15));
-        _uploadAttemptRetryMonitor = options.InstrumentationMeter is not null
-            ? new UploadAttemptRetryMonitor(options.InstrumentationMeter)
-            : default;
+
+        if (options.InstrumentationMeter is not null)
+        {
+            _uploadAttemptRetryMonitor = new UploadAttemptRetryMonitor(options.InstrumentationMeter);
+            _downloadAttemptRetryMonitor = new DownloadAttemptRetryMonitor(options.InstrumentationMeter);
+        }
 
         ClientId = options.ClientId ?? Guid.NewGuid().ToString();
 
@@ -98,38 +102,33 @@ public sealed class ProtonDriveClient
         return Node.GetAsync(this, shareId, nodeId, cancellationToken);
     }
 
-    public IAsyncEnumerable<INode> GetFolderChildrenAsync(
-        INodeIdentity folderIdentity,
-        CancellationToken cancellationToken,
-        bool includeHidden = false)
+    public IAsyncEnumerable<INode> GetFolderChildrenAsync(INodeIdentity folderIdentity, CancellationToken cancellationToken, bool includeHidden = false)
     {
         return FolderNode.GetFolderChildrenAsync(this, folderIdentity, includeHidden, cancellationToken);
     }
 
-    public async Task<IFileUploader> WaitForFileUploaderAsync(
-        long size,
-        int numberOfSamples,
-        CancellationToken cancellationToken)
+    public async Task<IFileUploader> WaitForFileUploaderAsync(long size, int numberOfSamples, CancellationToken cancellationToken)
     {
         var expectedNumberOfBlocks = (int)size.DivideAndRoundUp(RevisionWriter.DefaultBlockSize) + numberOfSamples;
 
         await RevisionCreationSemaphore.EnterAsync(expectedNumberOfBlocks, cancellationToken).ConfigureAwait(false);
 
-        if (_uploadAttemptRetryMonitor is not null)
-        {
-            return new FileUploaderObservabilityDecorator(
-                new FileUploader(this, expectedNumberOfBlocks),
-                _uploadAttemptRetryMonitor);
-        }
+        var fileUploader = new FileUploader(this, expectedNumberOfBlocks);
 
-        return new FileUploader(this, expectedNumberOfBlocks);
+        return _uploadAttemptRetryMonitor is not null
+            ? new FileUploaderObservabilityDecorator(fileUploader, _uploadAttemptRetryMonitor)
+            : fileUploader;
     }
 
-    public async Task<FileDownloader> WaitForFileDownloaderAsync(CancellationToken cancellationToken)
+    public async Task<IFileDownloader> WaitForFileDownloaderAsync(CancellationToken cancellationToken)
     {
         await BlockListingSemaphore.EnterAsync(1, cancellationToken).ConfigureAwait(false);
 
-        return new FileDownloader(this, 1);
+        var fileDownloader = new FileDownloader(this, expectedNumberOfBlocks: 1);
+
+        return _downloadAttemptRetryMonitor is not null
+            ? new FileDownloaderObservabilityDecorator(fileDownloader, _downloadAttemptRetryMonitor)
+            : fileDownloader;
     }
 
     public Task<Revision[]> GetFileRevisionsAsync(INodeIdentity fileIdentity, CancellationToken cancellationToken)

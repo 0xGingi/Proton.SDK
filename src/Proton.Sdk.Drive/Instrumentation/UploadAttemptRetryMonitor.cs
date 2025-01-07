@@ -24,8 +24,6 @@ internal sealed class UploadAttemptRetryMonitor(Meter meter)
         _retryMonitor.IncrementFailure(new InstrumentKey(volumeId.Value, parentLinkId.Value, fileName));
     }
 
-    private readonly record struct InstrumentKey(string VolumeId, string ParentLinkId, string FileName);
-
     private static JsonNode GetJsonNode(UploadSuccessRateMetricLabels labels)
     {
         return JsonSerializer.SerializeToNode(
@@ -33,4 +31,6 @@ internal sealed class UploadAttemptRetryMonitor(Meter meter)
                 ProtonDriveInstrumentationSerializerContext.Default.UploadSuccessRateMetricLabels)
             ?? throw new JsonException($"{typeof(UploadSuccessRateMetricLabels)} cannot be serialized");
     }
+
+    private readonly record struct InstrumentKey(string VolumeId, string ParentLinkId, string FileName);
 }

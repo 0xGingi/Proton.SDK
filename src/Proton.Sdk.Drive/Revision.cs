@@ -91,8 +91,8 @@ public sealed partial class Revision : IRevisionForTransfer
         ProtonDriveClient client,
         INodeIdentity fileIdentity,
         IRevisionForTransfer revisionMetadata,
-        CancellationToken cancellationToken,
         Action<int> releaseBlockListingAction,
+        CancellationToken cancellationToken,
         byte[]? operationId = null)
     {
         if (revisionMetadata.State is RevisionState.Draft)
