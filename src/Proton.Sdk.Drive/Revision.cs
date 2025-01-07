@@ -1,6 +1,5 @@
 using Google.Protobuf;
 using Google.Protobuf.Collections;
-using Microsoft.Extensions.Logging;
 using Proton.Sdk.Drive.Files;
 
 namespace Proton.Sdk.Drive;
@@ -102,6 +101,7 @@ public sealed partial class Revision : IRevisionForTransfer
         }
 
         var contentKey = await FileNode.GetFileContentKeyAsync(client, fileIdentity, cancellationToken).ConfigureAwait(false);
+        var fileKey = await Node.GetKeyAsync(client, fileIdentity, cancellationToken).ConfigureAwait(false);
 
         var revisionResponse = await client.FilesApi.GetRevisionAsync(
             fileIdentity.ShareId,
@@ -115,7 +115,7 @@ public sealed partial class Revision : IRevisionForTransfer
 
         await client.BlockDownloader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-        return new RevisionReader(client, fileIdentity, revisionMetadata, contentKey, revisionResponse, releaseBlockListingAction);
+        return new RevisionReader(client, fileIdentity, revisionMetadata, fileKey, contentKey, revisionResponse, releaseBlockListingAction);
     }
 
     internal static async Task<RevisionWriter> OpenForWritingAsync(

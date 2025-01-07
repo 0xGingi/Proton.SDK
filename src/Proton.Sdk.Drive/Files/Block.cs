@@ -1,8 +1,9 @@
 ﻿using System.Text.Json.Serialization;
+using Proton.Sdk.Cryptography;
 
 namespace Proton.Sdk.Drive.Files;
 
-public sealed class Block
+internal sealed class Block
 {
     public required int Index { get; init; }
 
@@ -10,8 +11,8 @@ public sealed class Block
     public required string Url { get; init; }
 
     [JsonPropertyName("EncSignature")]
-    public required string EncryptedSignature { get; init; }
+    public PgpArmoredMessage? EncryptedSignature { get; init; }
 
     [JsonPropertyName("SignatureEmail")]
-    public required string SignatureEmailAddress { get; init; }
+    public string? SignatureEmailAddress { get; init; }
 }

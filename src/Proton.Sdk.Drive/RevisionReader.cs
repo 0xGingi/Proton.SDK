@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Drive.Files;
 
@@ -12,6 +13,7 @@ public sealed class RevisionReader : IDisposable
     private readonly ProtonDriveClient _client;
     private readonly INodeIdentity _fileIdentity;
     private readonly IRevisionForTransfer _revision;
+    private readonly PgpPrivateKey _fileKey;
     private readonly PgpSessionKey _contentKey;
     private readonly RevisionResponse _revisionResponse;
     private readonly Action<int> _releaseBlockListingAction;
@@ -22,6 +24,7 @@ public sealed class RevisionReader : IDisposable
         ProtonDriveClient client,
         INodeIdentity fileIdentity,
         IRevisionForTransfer revision,
+        PgpPrivateKey fileKey,
         PgpSessionKey contentKey,
         RevisionResponse revisionResponse,
         Action<int> releaseBlockListingAction)
@@ -29,6 +32,7 @@ public sealed class RevisionReader : IDisposable
         _client = client;
         _fileIdentity = fileIdentity;
         _revision = revision;
+        _fileKey = fileKey;
         _contentKey = contentKey;
         _revisionResponse = revisionResponse;
         _releaseBlockListingAction = releaseBlockListingAction;
@@ -118,6 +122,12 @@ public sealed class RevisionReader : IDisposable
         {
             var downloadResult = await downloadTask.ConfigureAwait(false);
 
+            if (downloadResult.VerificationStatus is not (PgpVerificationStatus.Ok or PgpVerificationStatus.NotSigned))
+            {
+                throw new CryptographicException(
+                    $"Verification failed for block #{downloadResult.Index} of file with ID \"{_fileIdentity.NodeId}\" on volume with ID \"{_fileIdentity.VolumeId}\": {downloadResult.VerificationStatus}");
+            }
+
             manifestStream.Write(downloadResult.Sha256Digest.Span);
 
             if (!downloadResult.IsIntermediateStream)
@@ -156,9 +166,20 @@ public sealed class RevisionReader : IDisposable
             isIntermediateStream = true;
         }
 
-        var hash = await _client.BlockDownloader.DownloadAsync(block.Url, _contentKey, blockOutputStream, cancellationToken).ConfigureAwait(false);
+        var signatureVerificationKeys = block.SignatureEmailAddress != null
+            ? await _client.Account.GetAddressPublicKeysAsync(block.SignatureEmailAddress, cancellationToken).ConfigureAwait(false)
+            : null;
 
-        return new BlockDownloadResult(blockOutputStream, isIntermediateStream, hash);
+        var (hashDigest, verificationStatus) = await _client.BlockDownloader.DownloadAsync(
+            block.Url,
+            _contentKey,
+            block.EncryptedSignature,
+            _fileKey,
+            signatureVerificationKeys,
+            blockOutputStream,
+            cancellationToken).ConfigureAwait(false);
+
+        return new BlockDownloadResult(block.Index, blockOutputStream, isIntermediateStream, hashDigest, verificationStatus);
     }
 
     private async IAsyncEnumerable<(Block Value, bool IsLast)> GetBlocksAsync(RevisionResponse revisionResponse, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -259,10 +280,17 @@ public sealed class RevisionReader : IDisposable
         return verificationResult.Status;
     }
 
-    private readonly struct BlockDownloadResult(Stream stream, bool isIntermediateStream, ReadOnlyMemory<byte> sha256Digest)
+    private readonly struct BlockDownloadResult(
+        int index,
+        Stream stream,
+        bool isIntermediateStream,
+        ReadOnlyMemory<byte> sha256Digest,
+        PgpVerificationStatus verificationStatus)
     {
+        public int Index { get; } = index;
         public Stream Stream { get; } = stream;
         public bool IsIntermediateStream { get; } = isIntermediateStream;
         public ReadOnlyMemory<byte> Sha256Digest { get; } = sha256Digest;
+        public PgpVerificationStatus VerificationStatus { get; } = verificationStatus;
     }
 }
