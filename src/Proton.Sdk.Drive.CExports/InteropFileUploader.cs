@@ -8,9 +8,15 @@ namespace Proton.Sdk.Drive.CExports;
 
 internal static class InteropFileUploader
 {
-    private static bool TryGetFromHandle(nint uploaderHandle, [MaybeNullWhen(false)] out IFileUploader uploader)
+    private static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out IFileUploader uploader)
     {
-        var gcHandle = GCHandle.FromIntPtr(uploaderHandle);
+        if (handle == 0)
+        {
+            uploader = null;
+            return false;
+        }
+
+        var gcHandle = GCHandle.FromIntPtr(handle);
 
         uploader = gcHandle.Target as IFileUploader;
 

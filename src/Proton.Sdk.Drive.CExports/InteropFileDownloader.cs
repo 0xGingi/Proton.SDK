@@ -8,9 +8,15 @@ namespace Proton.Sdk.Drive.CExports;
 
 internal static class InteropFileDownloader
 {
-    private static bool TryGetFromHandle(nint downloaderHandle, [MaybeNullWhen(false)] out FileDownloader downloader)
+    private static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out FileDownloader downloader)
     {
-        var gcHandle = GCHandle.FromIntPtr(downloaderHandle);
+        if (handle == 0)
+        {
+            downloader = null;
+            return false;
+        }
+
+        var gcHandle = GCHandle.FromIntPtr(handle);
 
         downloader = gcHandle.Target as FileDownloader;
 

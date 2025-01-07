@@ -41,14 +41,12 @@ public sealed partial class FileNode : INode
 
         var signingKey = await client.Account.GetAddressPrimaryKeyAsync(
             fileUploadRequest.ShareMetadata.MembershipAddressId,
-            cancellationToken
-        ).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
 
         var parentFolderHashKey = await Node.GetHashKeyAsync(
-                client,
-                parentFolderIdentity,
-                cancellationToken)
-            .ConfigureAwait(false);
+            client,
+            parentFolderIdentity,
+            cancellationToken).ConfigureAwait(false);
 
         Node.GetCommonCreationParameters(
             fileUploadRequest.Name,

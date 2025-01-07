@@ -10,6 +10,12 @@ internal static class InteropProtonObservabilityService
 {
     internal static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out ObservabilityService service)
     {
+        if (handle == 0)
+        {
+            service = null;
+            return false;
+        }
+
         var gcHandle = GCHandle.FromIntPtr(handle);
 
         service = gcHandle.Target as ObservabilityService;

@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 
 namespace Proton.Sdk.CExports.Logging;
 
@@ -22,6 +21,12 @@ internal sealed class InteropLoggerProvider(InteropLogCallback logCallback) : IL
 
     internal static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out InteropLoggerProvider session)
     {
+        if (handle == 0)
+        {
+            session = null;
+            return false;
+        }
+
         var gcHandle = GCHandle.FromIntPtr(handle);
 
         session = gcHandle.Target as InteropLoggerProvider;

@@ -16,6 +16,8 @@
     <NeutralLanguage>en</NeutralLanguage>
     <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
+
+    <NativeLibPrefix Condition="'$(OS)' != 'Windows_NT' and '$(NativeSymbolExt)' != '.dSYM'">lib</NativeLibPrefix>
   </PropertyGroup>
 
   <ItemGroup>

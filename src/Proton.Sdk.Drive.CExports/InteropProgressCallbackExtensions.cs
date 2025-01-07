@@ -12,6 +12,16 @@ internal static class InteropProgressCallbackExtensions
             BytesCompleted = completed,
             BytesInTotal = total,
         };
-        progressCallback.OnProgress(progressCallback.State, InteropArray.FromMemory(progressUpdate.ToByteArray()));
+
+        var messageBytes = InteropArray.FromMemory(progressUpdate.ToByteArray());
+
+        try
+        {
+            progressCallback.OnProgress(progressCallback.State, messageBytes);
+        }
+        finally
+        {
+            messageBytes.Free();
+        }
     }
 }

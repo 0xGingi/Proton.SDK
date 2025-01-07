@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>libproton_drive_sdk</AssemblyName>
-    <AssemblyName Condition="!$(RuntimeIdentifier.StartsWith('linux')) And !$(RuntimeIdentifier.StartsWith('android'))">proton_drive_sdk</AssemblyName>
+    <AssemblyName>$(NativeLibPrefix)proton_drive_sdk</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <NativeCryptoLibName>proton_crypto</NativeCryptoLibName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,21 +15,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- While the project does not use the package directly, the path to the package is needed to refer to the static link library -->
-    <PackageReference Include="Proton.Cryptography" GeneratePathProperty="true" />
+    <IlcCompileInput Include="$(OutputPath)\$(NativeLibPrefix)proton_sdk.dll" />
+    <IlcCompileInput Include="$(OutputPath)\$(NativeLibPrefix)proton_instrumentation_sdk.dll" />
   </ItemGroup>
 
-  <PropertyGroup>
-    <CryptoLibFileName>libproton_crypto.a</CryptoLibFileName>
-    <CryptoLibFileName Condition="$(RuntimeIdentifier.StartsWith('win'))">proton_crypto.lib</CryptoLibFileName>
-    <CryptoLibFileName Condition="$(RuntimeIdentifier.StartsWith('osx')) Or $(RuntimeIdentifier.StartsWith('ios'))">proton_crypto.a</CryptoLibFileName>
-  </PropertyGroup>
+  <!-- Static-link the crypto library unless targeting Android -->
+  <ItemGroup Condition="!$(RuntimeIdentifier.StartsWith('linux-bionic'))">
+    <!-- While the project does not use the package directly, the path to the package is needed to refer to the static link library -->
+    <PackageReference Include="Proton.Cryptography" GeneratePathProperty="true" />
 
-  <ItemGroup>
-    <IlcCompileInput Include="$(OutputPath)\proton_sdk.dll" />
-    <IlcCompileInput Include="$(OutputPath)\proton_instrumentation_sdk.dll" />
-    <DirectPInvoke Include="proton_crypto" />
-    <NativeLibrary Include="$(PkgProton_Cryptography)\runtimes\$(RuntimeIdentifier)\native\$(CryptoLibFileName)" />
+    <DirectPInvoke Include="$(NativeCryptoLibName)" />
+    <NativeLibrary Include="$(PkgProton_Cryptography)\runtimes\$(RuntimeIdentifier)\native\$(NativeLibPrefix)$(NativeCryptoLibName)$(LibFileExt)" />
+  </ItemGroup>
+
+  <!-- If targeting Android, add the required SONAME to the output library -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux-bionic'))">
+    <LinkerArg Include="-Wl,-soname,$(AssemblyName)$(NativeBinaryExt)" />
   </ItemGroup>
 
 </Project>

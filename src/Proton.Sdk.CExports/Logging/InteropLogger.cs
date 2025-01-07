@@ -23,7 +23,17 @@ internal sealed class InteropLogger(InteropLogCallback logCallback, string categ
     {
         var message = formatter.Invoke(state, exception);
         var logEvent = new LogEvent { Level = (int)logLevel, Message = message, CategoryName = _categoryName };
-        _logCallback.Invoke(_logCallback.State, InteropArray.FromMemory(logEvent.ToByteArray()));
+
+        var messageBytes = InteropArray.FromMemory(logEvent.ToByteArray());
+
+        try
+        {
+            _logCallback.Invoke(_logCallback.State, messageBytes);
+        }
+        finally
+        {
+            messageBytes.Free();
+        }
     }
 
     public bool IsEnabled(LogLevel logLevel)

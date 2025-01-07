@@ -17,7 +17,7 @@ internal static class InteropCancellationTokenSource
 
     internal static bool TryGetTokenFromHandle(nint handle, out CancellationToken cancellationToken)
     {
-        if (handle == default)
+        if (handle == 0)
         {
             cancellationToken = CancellationToken.None;
             return true;
@@ -25,7 +25,7 @@ internal static class InteropCancellationTokenSource
 
         if (!TryGetFromHandle(handle, out var cancellationTokenSource))
         {
-            cancellationToken = default;
+            cancellationToken = CancellationToken.None;
             return false;
         }
 

@@ -21,7 +21,17 @@ internal static class InteropResponseCallbackExtensions
             RequestBody = requestBody,
             ResponseBody = responseBody,
         };
-        requestResponseBodyCallback.OnResponseBodyReceived(requestResponseBodyCallback.State, InteropArray.FromMemory(responseBodyResponse.ToByteArray()));
+
+        var messageBytes = InteropArray.FromMemory(responseBodyResponse.ToByteArray());
+
+        try
+        {
+            requestResponseBodyCallback.OnResponseBodyReceived(requestResponseBodyCallback.State, messageBytes);
+        }
+        finally
+        {
+            messageBytes.Free();
+        }
     }
 
     private static RequestMethod FromHttpMethod(HttpMethod method)

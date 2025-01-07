@@ -56,7 +56,7 @@ message ProtonClientOptions {
     string base_url = 3;
     optional bool disable_tls_pinning = 4;
     optional bool ignore_ssl_certificate_errors = 5;
-    int64 logger_provider_handle = 6;
+    optional int64 logger_provider_handle = 6;
 }
 
 message SessionBeginRequest {

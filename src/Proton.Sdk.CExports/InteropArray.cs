@@ -40,4 +40,9 @@ internal readonly unsafe struct InteropArray(byte* bytes, nint length)
     {
         return !IsNullOrEmpty ? new ReadOnlySpan<byte>(_bytes, (int)_length) : null;
     }
+
+    public void Free()
+    {
+        NativeMemory.Free(_bytes);
+    }
 }

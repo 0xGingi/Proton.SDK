@@ -24,14 +24,21 @@ internal static class InteropAsyncCallbackExtensions
         Func<CancellationToken, ValueTask<Result<T, T>>> asyncFunction,
         CancellationToken cancellationToken)
     {
-        var result = await asyncFunction.Invoke(cancellationToken).ConfigureAwait(false);
-
-        if (result.TryGetError(out var error, out var value))
+        try
         {
-            onFailure(error);
-            return;
-        }
+            var result = await asyncFunction.Invoke(cancellationToken).ConfigureAwait(false);
 
-        onSuccess(value);
+            if (result.TryGetError(out var error, out var value))
+            {
+                onFailure(error);
+                return;
+            }
+
+            onSuccess(value);
+        }
+        catch
+        {
+            // TODO: make this not silent
+        }
     }
 }

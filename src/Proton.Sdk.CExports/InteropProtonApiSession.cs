@@ -14,6 +14,12 @@ internal static class InteropProtonApiSession
 {
     internal static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out ProtonApiSession session)
     {
+        if (handle == 0)
+        {
+            session = null;
+            return false;
+        }
+
         var gcHandle = GCHandle.FromIntPtr(handle);
 
         session = gcHandle.Target as ProtonApiSession;
@@ -32,9 +38,19 @@ internal static class InteropProtonApiSession
         try
         {
             var onSecretRequested = new Func<KeyCacheMissMessage, bool>(
-                keyCacheMissMessage => secretRequestedCallback.OnSecretRequested(
-                    secretRequestedCallback.State,
-                    InteropArray.FromMemory(keyCacheMissMessage.ToByteArray())));
+                keyCacheMissMessage =>
+                {
+                    var messageBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
+
+                    try
+                    {
+                        return secretRequestedCallback.OnSecretRequested(secretRequestedCallback.State, messageBytes);
+                    }
+                    finally
+                    {
+                        messageBytes.Free();
+                    }
+                });
 
             return callback.InvokeFor(ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, onSecretRequested, ct));
         }
@@ -54,9 +70,19 @@ internal static class InteropProtonApiSession
         try
         {
             var onSecretRequested = new Func<KeyCacheMissMessage, bool>(
-                keyCacheMissMessage => secretRequestedCallback.OnSecretRequested(
-                    secretRequestedCallback.State,
-                    InteropArray.FromMemory(keyCacheMissMessage.ToByteArray())));
+                keyCacheMissMessage =>
+                {
+                    var messageBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
+
+                    try
+                    {
+                        return secretRequestedCallback.OnSecretRequested(secretRequestedCallback.State, messageBytes);
+                    }
+                    finally
+                    {
+                        messageBytes.Free();
+                    }
+                });
 
             var sessionResumeRequest = SessionResumeRequest.Parser.ParseFrom(sessionResumeRequestBytes.AsReadOnlySpan());
 
@@ -220,13 +246,13 @@ internal static class InteropProtonApiSession
         {
             var sessionBeginRequest = SessionBeginRequest.Parser.ParseFrom(sessionBeginRequestBytes.AsReadOnlySpan());
 
-            if (InteropLoggerProvider.TryGetFromHandle((nint)sessionBeginRequest.Options.LoggerProviderHandle, out var loggerProvider))
+            if (sessionBeginRequest.Options.HasLoggerProviderHandle
+                && InteropLoggerProvider.TryGetFromHandle((nint)sessionBeginRequest.Options.LoggerProviderHandle, out var loggerProvider))
             {
                 sessionBeginRequest.Options.LoggerFactory = new LoggerFactory([loggerProvider]);
             }
 
-            sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(
-                requestResponseBodyCallback);
+            sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
 
             sessionBeginRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
                 new InMemorySecretsCache(),

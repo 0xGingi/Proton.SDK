@@ -12,6 +12,12 @@ internal static class InteropProtonDriveClient
 {
     internal static bool TryGetFromHandle(nint handle, [MaybeNullWhen(false)] out ProtonDriveClient client)
     {
+        if (handle == 0)
+        {
+            client = null;
+            return false;
+        }
+
         var gcHandle = GCHandle.FromIntPtr(handle);
 
         client = gcHandle.Target as ProtonDriveClient;
