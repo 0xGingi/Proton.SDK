@@ -4,6 +4,9 @@
     <TargetFramework>net9.0</TargetFramework>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
+    <!-- It is necessary to specify a runtime identifier that will be overriden for dependencies, otherwise the property will be empty for dependencies -->
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+
     <Product>Proton Drive</Product>
     <Authors>Proton AG</Authors>
     <Company>Proton AG</Company>
@@ -17,7 +20,7 @@
     <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
 
-    <NativeLibPrefix Condition="'$(OS)' != 'Windows_NT' and '$(NativeSymbolExt)' != '.dSYM'">lib</NativeLibPrefix>
+    <NativeLibPrefix Condition="$(RuntimeIdentifier.StartsWith('linux')) or $(RuntimeIdentifier.StartsWith('android'))">lib</NativeLibPrefix>
   </PropertyGroup>
 
   <ItemGroup>

@@ -30,7 +30,7 @@
 
   <!-- If targeting Android, add the required SONAME to the output library -->
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux-bionic'))">
-    <LinkerArg Include="-Wl,-soname,$(AssemblyName)$(NativeBinaryExt)" />
+    <LinkerArg Include="-Wl,-soname,$(TargetName)$(NativeBinaryExt)" />
   </ItemGroup>
 
 </Project>
