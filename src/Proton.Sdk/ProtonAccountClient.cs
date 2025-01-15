@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Addresses;
 using Proton.Sdk.Cryptography;
@@ -24,6 +25,8 @@ public sealed class ProtonAccountClient(ProtonApiSession session)
     internal EventsApiClient EventsApi => new(_httpClient);
 
     internal ISecretsCache SecretsCache { get; } = session.SecretsCache;
+
+    internal ILogger<ProtonAccountClient> Logger { get; } = session.LoggerFactory.CreateLogger<ProtonAccountClient>();
 
     public Task<Address> GetAddressAsync(AddressId addressId, CancellationToken cancellationToken)
     {
@@ -68,18 +71,9 @@ public sealed class ProtonAccountClient(ProtonApiSession session)
         return Address.GetPrimaryKeyAsync(this, addressId, cancellationToken);
     }
 
-    internal async Task<IReadOnlyList<PgpPublicKey>> GetAddressPublicKeysAsync(string emailAddress, CancellationToken cancellationToken)
+    internal Task<IReadOnlyList<PgpPublicKey>> GetAddressPublicKeysAsync(string emailAddress, CancellationToken cancellationToken)
     {
-        var publicKeysResponse = await KeysApi.GetActivePublicKeysAsync(emailAddress, cancellationToken).ConfigureAwait(false);
-
-        var publicKeys = new List<PgpPublicKey>(publicKeysResponse.Address.Keys.Count);
-
-        publicKeys.AddRange(
-            publicKeysResponse.Address.Keys
-                .Where(keyEntry => keyEntry.Flags.HasFlag(PublicKeyFlags.IsNotCompromised))
-                .Select(entry => PgpPublicKey.Import(entry.PublicKey)));
-
-        return publicKeys;
+        return Address.GetPublicKeysAsync(this, emailAddress, cancellationToken);
     }
 
     private async Task RefreshUserKeysAsync(CancellationToken cancellationToken)

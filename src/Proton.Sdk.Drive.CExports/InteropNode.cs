@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.CExports;
+using Proton.Sdk.Cryptography;
 
 namespace Proton.Sdk.Drive.CExports;
 
@@ -39,15 +40,19 @@ internal static class InteropNode
     {
         try
         {
-            var nodeNameDecryptionRequest = NodeNameDecryptionRequest.Parser.ParseFrom(nodeNameDecryptionRequestBytes.AsReadOnlySpan());
+            var request = NodeNameDecryptionRequest.Parser.ParseFrom(nodeNameDecryptionRequestBytes.AsReadOnlySpan());
 
-            using var parentKey = await Node.GetKeyAsync(
+            using var parentKey = await Node.GetKeyAsync(client, request.NodeIdentity, cancellationToken).ConfigureAwait(false);
+
+            var name = await Node.DecryptNameAsync(
                 client,
-                nodeNameDecryptionRequest.NodeIdentity,
+                request.NodeIdentity.VolumeId,
+                request.NodeIdentity.NodeId,
+                parentKey,
+                new PgpArmoredMessage(PgpArmorDecoder.Decode(Encoding.ASCII.GetBytes(request.ArmoredEncryptedName))),
+                request.HasSignatureEmailAddress ? request.SignatureEmailAddress : null,
+                secretsCache: null,
                 cancellationToken).ConfigureAwait(false);
-
-            // TODO: verification
-            var name = parentKey.DecryptText(Encoding.UTF8.GetBytes(nodeNameDecryptionRequest.ArmoredEncryptedName).AsMemory().Span, PgpEncoding.AsciiArmor);
 
             return ResultExtensions.Success(name);
         }

@@ -263,4 +263,5 @@ message NodeKeysRegistrationRequest {
 message NodeNameDecryptionRequest {
     NodeIdentity node_identity = 1;
     string armored_encrypted_name = 2;
+    optional string signature_email_address = 3;
 }

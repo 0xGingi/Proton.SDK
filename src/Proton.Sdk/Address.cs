@@ -1,7 +1,9 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Addresses;
 using Proton.Sdk.Cryptography;
+using Proton.Sdk.Keys;
 
 namespace Proton.Sdk;
 
@@ -9,7 +11,9 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
 {
     private const string CacheAddressValueHolderName = "address";
     private const string CacheAddressKeysValueName = "keys";
+    private const string CacheAddressPublicKeysValueName = "public-keys";
     private const string CacheAddressKeyValueHolderName = "address-key";
+    private const string CacheAddressPublicKeyValueHolderName = "address-public-key";
     private const string CacheAddressKeyDataValueName = "data";
 
     public AddressId Id { get; } = id;
@@ -120,7 +124,7 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
                 AddressId = addressId,
                 AddressKeyId = addressKeyId,
                 // FIXME: Check flag
-                IsAllowedForEncryption = (keyDto.Flags & AddressKeyFlags.IsAllowedForEncryption) > 0
+                IsAllowedForEncryption = (keyDto.Flags & AddressKeyFlags.IsAllowedForEncryption) > 0,
             };
 
             keys.Add(key);
@@ -160,16 +164,73 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
         return addressKeys.Where(x => x.IsPrimary).Select(x => x.PrivateKey).First();
     }
 
+    internal static async Task<IReadOnlyList<PgpPublicKey>> GetPublicKeysAsync(
+        ProtonAccountClient client,
+        string emailAddress,
+        CancellationToken cancellationToken)
+    {
+        var groupCacheKey = GetAddressPublicKeyGroupCacheKey(emailAddress);
+
+        if (!client.SecretsCache.TryUseGroup(groupCacheKey, (data, _) => PgpPublicKey.Import(data), out var publicKeys))
+        {
+            Span<CacheKey> publicKeyCacheKeys;
+
+            try
+            {
+                var publicKeysResponse = await client.KeysApi.GetActivePublicKeysAsync(emailAddress, cancellationToken).ConfigureAwait(false);
+
+                publicKeys = new List<PgpPublicKey>(publicKeysResponse.Address.Keys.Count);
+                publicKeyCacheKeys = new CacheKey[publicKeysResponse.Address.Keys.Count];
+
+                for (var keyIndex = 0; keyIndex < publicKeyCacheKeys.Length; ++keyIndex)
+                {
+                    var keyEntry = publicKeysResponse.Address.Keys[keyIndex];
+                    if (!keyEntry.Flags.HasFlag(PublicKeyFlags.IsNotCompromised))
+                    {
+                        continue;
+                    }
+
+                    var publicKey = PgpPublicKey.Import(keyEntry.PublicKey);
+
+                    var cacheKey = GetAddressPublicKeyCacheKey(emailAddress, keyIndex);
+                    publicKeyCacheKeys[keyIndex] = cacheKey;
+                    client.SecretsCache.Set(cacheKey, publicKey.ToBytes(), (byte)keyEntry.Flags);
+
+                    publicKeys.Add(publicKey);
+                }
+
+                publicKeyCacheKeys = publicKeyCacheKeys[..publicKeys.Count];
+            }
+            catch (ProtonApiException e) when (e.Code is ResponseCode.UnknownAddress)
+            {
+                client.Logger.LogError(e, "Unknown address {EmailAddress}", emailAddress);
+
+                publicKeyCacheKeys = [];
+                publicKeys = [];
+            }
+
+            client.SecretsCache.IncludeInGroup(groupCacheKey, publicKeyCacheKeys);
+        }
+
+        return publicKeys;
+    }
+
     internal static CacheKey GetAddressKeyGroupCacheKey(AddressId id) => new(CacheAddressValueHolderName, id.Value, CacheAddressKeysValueName);
     internal static CacheKey GetAddressKeyCacheKey(AddressKeyId id) => new(CacheAddressKeyValueHolderName, id.Value, CacheAddressKeyDataValueName);
+
+    internal static CacheKey GetAddressPublicKeyGroupCacheKey(string emailAddress) =>
+        new(CacheAddressValueHolderName, emailAddress, CacheAddressPublicKeysValueName);
+
+    internal static CacheKey GetAddressPublicKeyCacheKey(string emailAddress, int number) =>
+        new(CacheAddressPublicKeyValueHolderName, $"{emailAddress}({number})", CacheAddressPublicKeyValueHolderName);
 
     private static ReadOnlyMemory<byte> GetAddressKeyTokenPassphrase(
         PgpArmoredMessage token,
         PgpArmoredSignature signature,
         IReadOnlyList<PgpPrivateKey> userKeys)
     {
-        // TODO: verification
-        using var decryptingStream = PgpDecryptingStream.Open(token.Bytes.AsStream(), new PgpPrivateKeyRing(userKeys));
+        var userKeyRing = new PgpPrivateKeyRing(userKeys);
+        using var decryptingStream = PgpDecryptingStream.Open(token.Bytes.AsStream(), userKeyRing, signature, userKeyRing);
 
         using var passphraseStream = new MemoryStream();
         decryptingStream.CopyTo(passphraseStream);

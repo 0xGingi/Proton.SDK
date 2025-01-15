@@ -103,14 +103,14 @@ internal static class InteropProtonDriveClient
             if (request.ContentKeyRawUnlockedData?.IsEmpty == false)
             {
                 client.SecretsCache.Set(
-                    Node.GetContentKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId),
+                    FileNode.GetContentKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId),
                     request.ContentKeyRawUnlockedData.Span);
             }
 
             if (request.HashKeyRawUnlockedData?.IsEmpty == false)
             {
                 client.SecretsCache.Set(
-                    Node.GetHashKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId),
+                    FolderNode.GetHashKeyCacheKey(request.NodeIdentity.VolumeId, request.NodeIdentity.NodeId),
                     request.HashKeyRawUnlockedData.Span);
             }
 

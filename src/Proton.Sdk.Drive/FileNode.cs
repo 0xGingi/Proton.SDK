@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Google.Protobuf;
+using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Files;
@@ -9,6 +10,8 @@ namespace Proton.Sdk.Drive;
 
 public sealed partial class FileNode : INode
 {
+    internal const string CacheContentKeyValueName = "content-key";
+
     internal FileNode(
         NodeIdentity nodeIdentity,
         LinkId? parentId,
@@ -84,7 +87,8 @@ public sealed partial class FileNode : INode
         RevisionId createdRevisionId;
         try
         {
-            var response = await client.FilesApi.CreateFileAsync(parentFolderIdentity.ShareId, parameters, cancellationToken, operationId).ConfigureAwait(false);
+            var response = await client.FilesApi.CreateFileAsync(parentFolderIdentity.ShareId, parameters, cancellationToken, operationId)
+                .ConfigureAwait(false);
 
             createdNodeId = new LinkId(response.Identities.LinkId);
             createdRevisionId = new RevisionId(response.Identities.RevisionId);
@@ -92,7 +96,7 @@ public sealed partial class FileNode : INode
             client.SecretsCache.Set(Node.GetNodeKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), key.ToBytes());
             client.SecretsCache.Set(Node.GetNameSessionKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), nameSessionKey.Export().Token);
             client.SecretsCache.Set(Node.GetPassphraseSessionKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), passphraseSessionKey.Export().Token);
-            client.SecretsCache.Set(Node.GetContentKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), contentKeyToken);
+            client.SecretsCache.Set(GetContentKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), contentKeyToken);
         }
         catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { DraftClientId: not null, DraftRevisionId: not null } })
         {
@@ -125,7 +129,7 @@ public sealed partial class FileNode : INode
             },
             ParentId = fileUploadRequest.ParentFolderIdentity.NodeId,
             Name = fileUploadRequest.Name,
-            NameHashDigest = ByteString.CopyFrom(nameHashDigest),
+            NameHashDigest = ByteStringExtensions.FromMemory(nameHashDigest),
             State = NodeState.Draft,
         };
 
@@ -150,16 +154,21 @@ public sealed partial class FileNode : INode
 
         var response = await client.FilesApi.GetRevisionsAsync(fileNodeIdentity.ShareId, fileNodeIdentity.NodeId, cancellationToken).ConfigureAwait(false);
 
-        return response.Revisions.Select(
-            dto =>
+        return await Task.WhenAll(response.Revisions.Select(
+            async dto =>
             {
-                // TODO: verify signature
-                var extendedAttributes = dto.ExtendedAttributes is not null
-                    ? JsonSerializer.Deserialize(fileKey.Decrypt(dto.ExtendedAttributes.Value), ProtonDriveApiSerializerContext.Default.ExtendedAttributes)
-                    : default;
+                var extendedAttributes = await DecryptExtendedAttributesAsync(
+                    client,
+                    fileNodeIdentity.VolumeId,
+                    fileNodeIdentity.NodeId,
+                    new RevisionId(dto.Id),
+                    fileKey,
+                    dto.ExtendedAttributes,
+                    dto.SignatureEmailAddress,
+                    cancellationToken).ConfigureAwait(false);
 
                 return new Revision(fileNodeIdentity.VolumeId, fileNodeIdentity.NodeId, dto, extendedAttributes);
-            }).ToArray();
+            })).ConfigureAwait(false);
     }
 
     internal static async Task<Revision> GetFileRevisionAsync(
@@ -168,23 +177,24 @@ public sealed partial class FileNode : INode
         RevisionId revisionId,
         CancellationToken cancellationToken)
     {
-        var fileKey = await Node.GetKeyAsync(client, fileNodeIdentity, cancellationToken).ConfigureAwait(false);
-
         var response = await client.FilesApi.GetRevisionAsync(fileNodeIdentity.ShareId, fileNodeIdentity.NodeId, revisionId, 1, 1, true, cancellationToken)
             .ConfigureAwait(false);
 
-        // TODO: verify signature
+        var fileKey = await Node.GetKeyAsync(client, fileNodeIdentity, cancellationToken).ConfigureAwait(false);
+
         var extendedAttributes = response.Revision.ExtendedAttributes is not null
-            ? JsonSerializer.Deserialize(
-                fileKey.Decrypt(response.Revision.ExtendedAttributes.Value),
-                ProtonDriveApiSerializerContext.Default.ExtendedAttributes)
+            ? await DecryptExtendedAttributesAsync(
+                client,
+                fileNodeIdentity.VolumeId,
+                fileNodeIdentity.NodeId,
+                revisionId,
+                fileKey,
+                response.Revision.ExtendedAttributes,
+                response.Revision.SignatureEmailAddress,
+                cancellationToken).ConfigureAwait(false)
             : default;
 
-        return new Revision(
-            fileNodeIdentity.VolumeId,
-            fileNodeIdentity.NodeId,
-            response.Revision,
-            extendedAttributes);
+        return new Revision(fileNodeIdentity.VolumeId, fileNodeIdentity.NodeId, response.Revision, extendedAttributes);
     }
 
     internal static async Task<PgpSessionKey> GetFileContentKeyAsync(
@@ -194,14 +204,14 @@ public sealed partial class FileNode : INode
         byte[]? operationId = null)
     {
         if (!client.SecretsCache.TryUse(
-            Node.GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
+            GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
             (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
             out var nameKey))
         {
             await Node.GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken, operationId).ConfigureAwait(false);
 
             if (!client.SecretsCache.TryUse(
-                Node.GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
+                GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
                 (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
                 out nameKey))
             {
@@ -210,5 +220,98 @@ public sealed partial class FileNode : INode
         }
 
         return nameKey;
+    }
+
+    internal static async Task<ExtendedAttributes> DecryptExtendedAttributesAsync(
+        ProtonDriveClient client,
+        VolumeId volumeId,
+        LinkId fileId,
+        RevisionId revisionId,
+        PgpPrivateKey fileKey,
+        PgpArmoredMessage? encryptedExtendedAttributes,
+        string? signatureEmailAddress,
+        CancellationToken cancellationToken)
+    {
+        if (encryptedExtendedAttributes is null)
+        {
+            return default;
+        }
+
+        PgpKeyRing verificationKeyRing;
+        if (signatureEmailAddress is not null)
+        {
+            var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
+            verificationKeyRing = new PgpKeyRing(verificationKeys);
+        }
+        else
+        {
+            verificationKeyRing = new PgpKeyRing(fileKey);
+        }
+
+        var serializedExtendedAttributes = fileKey.DecryptAndVerify(encryptedExtendedAttributes.Value, verificationKeyRing, out var verificationResult);
+
+        if (verificationResult.Status is not PgpVerificationStatus.Ok)
+        {
+            client.Logger.LogWarning(
+                "Signature verification failed for extended attributes (volume ID: {VolumeId}, file ID: {FileNodeId}, revision ID: {RevisionId})",
+                volumeId,
+                fileId,
+                revisionId);
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize(serializedExtendedAttributes, ProtonDriveApiSerializerContext.Default.ExtendedAttributes);
+        }
+        catch (Exception e)
+        {
+            client.Logger.LogError(
+                e,
+                "Failed to decrypt extended attributes (volume ID: {VolumeId}, file ID: {FileNodeId}, revision ID: {RevisionId})",
+                volumeId,
+                fileId,
+                revisionId);
+
+            return default;
+        }
+    }
+
+    internal static CacheKey GetContentKeyCacheKey(VolumeId volumeId, LinkId nodeId)
+        => new(Node.CacheContextName, volumeId.Value, Node.CacheValueHolderName, nodeId.Value, CacheContentKeyValueName);
+
+    internal static PgpSessionKey DecryptContentKey(
+        ProtonDriveClient client,
+        VolumeId volumeId,
+        LinkId fileId,
+        PgpPrivateKey nodeKey,
+        ReadOnlyMemory<byte> contentKeyPacket,
+        PgpArmoredSignature? contentKeySignature,
+        PgpKeyRing verificationKeyRing,
+        ISecretsCache secretsCache)
+    {
+        var contentKey = nodeKey.DecryptSessionKey(contentKeyPacket.Span);
+        secretsCache.Set(GetContentKeyCacheKey(volumeId, fileId), contentKey.Export().Token);
+
+        if (contentKeySignature is null)
+        {
+            client.Logger.LogWarning("Missing content key signature (volume ID: {VolumeId}, file ID: {FileNodeId})", volumeId, fileId);
+            return contentKey;
+        }
+
+        try
+        {
+            var verificationResult = verificationKeyRing.Verify(contentKey.Export().Token, contentKeySignature.Value);
+
+            if (verificationResult.Status is not PgpVerificationStatus.Ok)
+            {
+                client.Logger.LogWarning("Signature verification failed for content key (volume ID: {VolumeId}, file ID: {FileNodeId})", volumeId, fileId);
+            }
+        }
+        catch (Exception e)
+        {
+            client.Logger.LogError(e, "Error while verifying content key (volume ID: {VolumeId}, file ID: {FileNodeId})", volumeId, fileId);
+        }
+
+        return contentKey;
     }
 }

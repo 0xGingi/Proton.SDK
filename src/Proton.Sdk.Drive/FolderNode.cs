@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using Google.Protobuf;
+using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Drive.Folders;
@@ -10,6 +11,8 @@ namespace Proton.Sdk.Drive;
 
 public sealed partial class FolderNode : INode
 {
+    internal const string CacheHashKeyValueName = "hash-key";
+
     internal FolderNode(
         NodeIdentity nodeIdentity,
         LinkId? parentId,
@@ -42,7 +45,7 @@ public sealed partial class FolderNode : INode
 
             foreach (var childLink in response.Links)
             {
-                yield return Node.Decrypt(client, childLink, folderKey);
+                yield return await Node.DecryptAsync(client, childLink, folderKey, cancellationToken).ConfigureAwait(false);
             }
 
             ++parameters.PageIndex;
@@ -119,7 +122,7 @@ public sealed partial class FolderNode : INode
         client.SecretsCache.Set(Node.GetNodeKeyCacheKey(parentFolder.VolumeId, folderId), key.ToBytes());
         client.SecretsCache.Set(Node.GetNameSessionKeyCacheKey(parentFolder.VolumeId, folderId), nameSessionKey.Export().Token);
         client.SecretsCache.Set(Node.GetPassphraseSessionKeyCacheKey(parentFolder.VolumeId, folderId), passphraseSessionKey.Export().Token);
-        client.SecretsCache.Set(Node.GetHashKeyCacheKey(parentFolder.VolumeId, folderId), hashKey);
+        client.SecretsCache.Set(GetHashKeyCacheKey(parentFolder.VolumeId, folderId), hashKey);
 
         return new FolderNode
         {
@@ -130,8 +133,31 @@ public sealed partial class FolderNode : INode
             },
             ParentId = parentFolder.NodeId,
             Name = name,
-            NameHashDigest = ByteString.CopyFrom(nameHashDigest.ToArray()),
+            NameHashDigest = ByteStringExtensions.FromMemory(nameHashDigest),
             State = NodeState.Active,
         };
+    }
+
+    internal static CacheKey GetHashKeyCacheKey(VolumeId volumeId, LinkId nodeId)
+        => new(Node.CacheContextName, volumeId.Value, Node.CacheValueHolderName, nodeId.Value, CacheHashKeyValueName);
+
+    internal static ReadOnlyMemory<byte> DecryptHashKey(
+        ProtonDriveClient client,
+        VolumeId volumeId,
+        LinkId folderId,
+        PgpPrivateKey nodeKey,
+        PgpArmoredMessage encryptedHashKey,
+        PgpKeyRing verificationKeyRing,
+        ISecretsCache secretsCache)
+    {
+        var hashKey = nodeKey.DecryptAndVerify(encryptedHashKey, verificationKeyRing, out var verificationResult);
+        secretsCache.Set(GetHashKeyCacheKey(volumeId, folderId), hashKey);
+
+        if (verificationResult.Status is not PgpVerificationStatus.Ok)
+        {
+            client.Logger.LogWarning("Signature verification failed for hash key (volume ID: {VolumeId}, folder ID: {FolderNodeId})", volumeId, folderId);
+        }
+
+        return hashKey;
     }
 }

@@ -68,7 +68,8 @@ public sealed class InMemorySecretsCache : ISecretsCache
             if (!_memoryCache.TryGetValue<CacheKey[]>(groupCacheKey, out var cacheKeys) || cacheKeys is null)
             {
                 Debug.WriteLine($"Cache: Group key {groupCacheKey} not found");
-                result = default;
+
+                result = null;
                 return false;
             }
 
