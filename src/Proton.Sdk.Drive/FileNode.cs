@@ -238,7 +238,7 @@ public sealed partial class FileNode : INode
         }
 
         PgpKeyRing verificationKeyRing;
-        if (signatureEmailAddress is not null)
+        if (!string.IsNullOrEmpty(signatureEmailAddress))
         {
             var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
             verificationKeyRing = new PgpKeyRing(verificationKeys);

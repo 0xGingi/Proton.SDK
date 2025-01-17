@@ -339,7 +339,7 @@ public class Node : INode
         secretsCache?.Set(GetNameSessionKeyCacheKey(volumeId, nodeId), sessionKey.Export().Token);
 
         PgpKeyRing verificationKeyRing;
-        if (signatureEmailAddress is not null)
+        if (!string.IsNullOrEmpty(signatureEmailAddress))
         {
             var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
             verificationKeyRing = new PgpKeyRing(verificationKeys);
@@ -365,7 +365,7 @@ public class Node : INode
         string? signatureEmailAddress,
         CancellationToken cancellationToken)
     {
-        var addressVerificationKeys = signatureEmailAddress is not null
+        var addressVerificationKeys = !string.IsNullOrEmpty(signatureEmailAddress)
             ? await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false)
             : [];
 
@@ -400,7 +400,7 @@ public class Node : INode
         else
         {
             PgpKeyRing verificationKeyRing;
-            if (signatureEmailAddress is not null)
+            if (!string.IsNullOrEmpty(signatureEmailAddress))
             {
                 var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
                 verificationKeyRing = new PgpKeyRing(verificationKeys);

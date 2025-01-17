@@ -166,16 +166,16 @@ public sealed class RevisionReader : IDisposable
             isIntermediateStream = true;
         }
 
-        var signatureVerificationKeys = block.SignatureEmailAddress != null
-            ? await _client.Account.GetAddressPublicKeysAsync(block.SignatureEmailAddress, cancellationToken).ConfigureAwait(false)
-            : null;
+        var signatureVerificationKeyRing = !string.IsNullOrEmpty(block.SignatureEmailAddress)
+            ? new PgpKeyRing(await _client.Account.GetAddressPublicKeysAsync(block.SignatureEmailAddress, cancellationToken).ConfigureAwait(false))
+            : new PgpKeyRing(_fileKey);
 
         var (hashDigest, verificationStatus) = await _client.BlockDownloader.DownloadAsync(
             block.Url,
             _contentKey,
             block.EncryptedSignature,
             _fileKey,
-            signatureVerificationKeys,
+            signatureVerificationKeyRing,
             blockOutputStream,
             cancellationToken).ConfigureAwait(false);
 

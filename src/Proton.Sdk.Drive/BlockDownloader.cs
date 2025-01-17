@@ -24,7 +24,7 @@ internal sealed class BlockDownloader
         PgpSessionKey contentKey,
         ReadOnlyMemory<byte>? encryptedSignature,
         PgpPrivateKey signatureDecryptionKey,
-        IReadOnlyList<PgpPublicKey>? verificationKeys,
+        PgpKeyRing verificationKeyRing,
         Stream outputStream,
         CancellationToken cancellationToken)
     {
@@ -36,8 +36,6 @@ internal sealed class BlockDownloader
 
         // TODO: use array pool for decrypted signature
         var signature = encryptedSignature is not null ? signatureDecryptionKey.Decrypt(encryptedSignature.Value.Span) : default(ArraySegment<byte>?);
-
-        var verificationKeyRing = new PgpKeyRing(verificationKeys ?? []);
 
         PgpVerificationStatus verificationStatus;
 
