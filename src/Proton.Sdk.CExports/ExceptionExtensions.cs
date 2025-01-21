@@ -47,7 +47,7 @@ internal static class ExceptionExtensions
             case HttpRequestException ex:
                 error.Domain = ErrorDomain.Transport;
                 error.PrimaryCode = (long)ex.HttpRequestError;
-                error.SecondaryCode = ex.StatusCode is not null ? (long)ex.StatusCode : default;
+                error.SecondaryCode = ex.StatusCode is not null ? (long)ex.StatusCode : 0;
                 break;
 
             case TimeoutRejectedException:

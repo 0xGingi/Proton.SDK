@@ -14,8 +14,8 @@ internal static class ProtonClientConfigurationExtensions
     public static HttpClient GetHttpClient(
         this ProtonClientConfiguration config,
         ProtonApiSession? session = null,
-        string? baseRoutePath = default,
-        TimeSpan? attemptTimeout = default)
+        string? baseRoutePath = null,
+        TimeSpan? attemptTimeout = null)
     {
         var baseAddress = config.BaseUrl + (baseRoutePath ?? string.Empty);
 

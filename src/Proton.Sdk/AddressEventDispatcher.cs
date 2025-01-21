@@ -3,18 +3,13 @@ using Proton.Sdk.Events;
 
 namespace Proton.Sdk;
 
-public sealed class AddressEventDispatcher : IEventDispatcher
+public sealed class AddressEventDispatcher(AccountEventChannel eventChannel) : IEventDispatcher
 {
-    private readonly AccountEventChannel _eventChannel;
+    private readonly AccountEventChannel _eventChannel = eventChannel;
 
     private Action<Address>? _addressAddedHandlers;
     private Action<Address>? _addressChangedHandlers;
     private Action<AddressId>? _addressRemovedHandlers;
-
-    public AddressEventDispatcher(AccountEventChannel eventChannel)
-    {
-        _eventChannel = eventChannel;
-    }
 
     public event Action<Address>? AddressAdded
     {
