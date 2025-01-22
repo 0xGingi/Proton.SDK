@@ -42,6 +42,8 @@ internal static class ProtonClientConfigurationExtensions
                         }
                     });
 
+                builder.AddHttpMessageHandler(() => new CryptographyTimeProvisionHandler());
+
                 if (config.CustomHttpMessageHandlerFactory is not null)
                 {
                     builder.AddHttpMessageHandler(() => config.CustomHttpMessageHandlerFactory.Invoke());
