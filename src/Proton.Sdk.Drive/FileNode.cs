@@ -197,7 +197,7 @@ public sealed partial class FileNode : INode
         return new Revision(fileNodeIdentity.VolumeId, fileNodeIdentity.NodeId, response.Revision, extendedAttributes);
     }
 
-    internal static async Task<PgpSessionKey> GetFileContentKeyAsync(
+    internal static async Task<PgpSessionKey> GetContentKeyAsync(
         ProtonDriveClient client,
         INodeIdentity nodeIdentity,
         CancellationToken cancellationToken,

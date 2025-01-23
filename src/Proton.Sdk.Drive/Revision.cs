@@ -100,7 +100,7 @@ public sealed partial class Revision : IRevisionForTransfer
             throw new InvalidOperationException("Draft revision cannot be opened for reading");
         }
 
-        var contentKey = await FileNode.GetFileContentKeyAsync(client, fileIdentity, cancellationToken).ConfigureAwait(false);
+        var contentKey = await FileNode.GetContentKeyAsync(client, fileIdentity, cancellationToken).ConfigureAwait(false);
         var fileKey = await Node.GetKeyAsync(client, fileIdentity, cancellationToken).ConfigureAwait(false);
 
         var revisionResponse = await client.FilesApi.GetRevisionAsync(
@@ -131,7 +131,7 @@ public sealed partial class Revision : IRevisionForTransfer
         }
 
         var fileKey = await Node.GetKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken, operationId).ConfigureAwait(false);
-        var contentKey = await FileNode.GetFileContentKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken, operationId).ConfigureAwait(false);
+        var contentKey = await FileNode.GetContentKeyAsync(client, revisionUploadRequest.FileIdentity, cancellationToken, operationId).ConfigureAwait(false);
         var signingKey = await client.Account.GetAddressPrimaryKeyAsync(revisionUploadRequest.ShareMetadata.MembershipAddressId, cancellationToken).ConfigureAwait(false);
 
         await client.BlockUploader.FileSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
