@@ -30,13 +30,30 @@ internal sealed class FileDownloader : IFileDownloader
 
     public async Task<VerificationStatus> DownloadAsync(
         INodeIdentity fileIdentity,
-        IRevisionForTransfer revision,
+        IRevisionForTransfer? revision,
         string targetFilePath,
         Action<long, long> onProgress,
         CancellationToken cancellationToken,
         byte[]? operationId = null)
     {
-        using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revision, ReleaseBlockListing, cancellationToken, operationId)
+        IRevisionForTransfer revisionForTransfer;
+        if (revision is not null)
+        {
+            revisionForTransfer = revision;
+        }
+        else
+        {
+            var revisions = await _client.GetFileRevisionsAsync(fileIdentity, cancellationToken)
+                .ConfigureAwait(false);
+            if (!revisions.Any())
+            {
+                throw new ProtonApiException($"No revisions found for file {fileIdentity.NodeId.Value}");
+            }
+
+            revisionForTransfer = revisions.First();
+        }
+
+        using var revisionReader = await Revision.OpenForReadingAsync(_client, fileIdentity, revisionForTransfer, ReleaseBlockListing, cancellationToken, operationId)
             .ConfigureAwait(false);
 
         FileStream fileStream;

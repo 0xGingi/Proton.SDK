@@ -11,7 +11,7 @@ public interface IFileDownloader : IDisposable
 
     public Task<VerificationStatus> DownloadAsync(
         INodeIdentity fileIdentity,
-        IRevisionForTransfer revision,
+        IRevisionForTransfer? revision,
         string targetFilePath,
         Action<long, long> onProgress,
         CancellationToken cancellationToken,

@@ -40,7 +40,7 @@ public sealed class FileDownloaderObservabilityDecorator : IFileDownloader
 
     public async Task<VerificationStatus> DownloadAsync(
         INodeIdentity fileIdentity,
-        IRevisionForTransfer revision,
+        IRevisionForTransfer? revision,
         string targetFilePath,
         Action<long, long> onProgress,
         CancellationToken cancellationToken,
