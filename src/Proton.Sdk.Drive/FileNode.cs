@@ -98,7 +98,7 @@ public sealed partial class FileNode : INode
             client.SecretsCache.Set(Node.GetPassphraseSessionKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), passphraseSessionKey.Export().Token);
             client.SecretsCache.Set(GetContentKeyCacheKey(parentFolderIdentity.VolumeId, createdNodeId), contentKeyToken);
         }
-        catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { DraftClientId: not null, DraftRevisionId: not null } })
+        catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { LinkId: not null, DraftClientId: not null, DraftRevisionId: not null } })
         {
             if (ex.Response.Conflict.DraftClientId != client.ClientId)
             {

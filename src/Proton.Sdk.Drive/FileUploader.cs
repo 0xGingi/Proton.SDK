@@ -42,7 +42,7 @@ public sealed class FileUploader : IFileUploader
         {
             fileUploadResponse = await FileNode.CreateFileAsync(_client, fileUploadRequest, cancellationToken, operationId).ConfigureAwait(false);
         }
-        catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { RevisionId: not null, DraftRevisionId: null } })
+        catch (ProtonApiException<RevisionConflictResponse> ex) when (ex.Response is { Conflict: { LinkId: not null, RevisionId: not null, DraftRevisionId: null } })
         {
             var conflictingNode = await Node.GetAsync(
                 _client,

@@ -5,7 +5,7 @@ namespace Proton.Sdk.Drive.Files;
 internal sealed class RevisionConflict
 {
     [JsonPropertyName("ConflictLinkID")]
-    public required string LinkId { get; init; }
+    public string? LinkId { get; init; }
 
     [JsonPropertyName("ConflictRevisionID")]
     public string? RevisionId { get; init; }
