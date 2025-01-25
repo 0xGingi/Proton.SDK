@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Proton.Cryptography.Pgp;
 using Proton.Cryptography.Srp;
 using Proton.Sdk.Authentication;
 using Proton.Sdk.Cryptography;
@@ -24,6 +25,7 @@ public sealed class ProtonApiSession
         PasswordMode passwordMode,
         ProtonClientConfiguration configuration)
     {
+        PgpEnvironment.DefaultTimeProviderOverride = null;
         _httpClient = configuration.GetHttpClient(this);
 
         Username = username;
