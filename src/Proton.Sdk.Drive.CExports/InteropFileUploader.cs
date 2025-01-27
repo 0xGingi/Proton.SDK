@@ -84,7 +84,7 @@ internal static class InteropFileUploader
         {
             var gcHandle = GCHandle.FromIntPtr(uploaderHandle);
 
-            if (gcHandle.Target is not FileUploader fileUploader)
+            if (gcHandle.Target is not IFileUploader fileUploader)
             {
                 return;
             }
