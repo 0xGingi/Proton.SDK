@@ -75,6 +75,8 @@ internal sealed class BlockUploader
                             sha256Digest = sha256.Hash ?? [];
                         }
 
+                        // The signature stream should not be closed until the signature is no longer needed, because the underlying buffer could be re-used,
+                        // leading to a garbage signature.
                         var signature = signatureStream.GetBuffer().AsMemory()[..(int)signatureStream.Length];
 
                         var verificationToken = verifier.VerifyBlock(dataPacketStream.GetFirstBytes(128), plainDataPrefix.AsSpan()[..plainDataPrefixLength]);
