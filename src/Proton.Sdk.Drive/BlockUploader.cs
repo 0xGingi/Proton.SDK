@@ -45,14 +45,13 @@ internal sealed class BlockUploader
                 var dataPacketStream = ProtonDriveClient.MemoryStreamManager.GetStream();
                 await using (dataPacketStream.ConfigureAwait(false))
                 {
-                    byte[] sha256Digest;
-                    ReadOnlyMemory<byte> signature;
+                    var signatureStream = ProtonDriveClient.MemoryStreamManager.GetStream();
 
-                    await using (plainDataStream.ConfigureAwait(false))
+                    await using (signatureStream.ConfigureAwait(false))
                     {
-                        var signatureStream = ProtonDriveClient.MemoryStreamManager.GetStream();
+                        byte[] sha256Digest;
 
-                        await using (signatureStream.ConfigureAwait(false))
+                        await using (plainDataStream.ConfigureAwait(false))
                         {
                             using var sha256 = SHA256.Create();
 
@@ -73,22 +72,22 @@ internal sealed class BlockUploader
                                 }
                             }
 
-                            signature = signatureStream.GetBuffer().AsMemory()[..(int)signatureStream.Length];
                             sha256Digest = sha256.Hash ?? [];
                         }
-                    }
 
-                    var verificationToken = verifier.VerifyBlock(dataPacketStream.GetFirstBytes(128), plainDataPrefix.AsSpan()[..plainDataPrefixLength]);
+                        var signature = signatureStream.GetBuffer().AsMemory()[..(int)signatureStream.Length];
 
-                    var parameters = new BlockUploadRequestParameters
-                    {
-                        AddressId = shareMetadata.MembershipAddressId.Value,
-                        ShareId = shareMetadata.ShareId.Value,
-                        LinkId = fileId.Value,
-                        RevisionId = revisionId.Value,
-                        Blocks =
-                        [
-                            new BlockCreationParameters
+                        var verificationToken = verifier.VerifyBlock(dataPacketStream.GetFirstBytes(128), plainDataPrefix.AsSpan()[..plainDataPrefixLength]);
+
+                        var parameters = new BlockUploadRequestParameters
+                        {
+                            AddressId = shareMetadata.MembershipAddressId.Value,
+                            ShareId = shareMetadata.ShareId.Value,
+                            LinkId = fileId.Value,
+                            RevisionId = revisionId.Value,
+                            Blocks =
+                            [
+                                new BlockCreationParameters
                             {
                                 Index = index,
                                 Size = (int)dataPacketStream.Length,
@@ -97,21 +96,22 @@ internal sealed class BlockUploader
                                 VerifierOutput = new BlockVerifierOutput { Token = verificationToken.AsReadOnlyMemory() },
                             },
                         ],
-                        Thumbnails = [],
-                    };
+                            Thumbnails = [],
+                        };
 
-                    var uploadRequestResponse = await _client.FilesApi.RequestBlockUploadAsync(parameters, cancellationToken).ConfigureAwait(false);
+                        var uploadRequestResponse = await _client.FilesApi.RequestBlockUploadAsync(parameters, cancellationToken).ConfigureAwait(false);
 
-                    var uploadTarget = uploadRequestResponse.UploadTargets[0];
-                    var uploadTargetUrl = $"{uploadTarget.BareUrl}/{uploadTarget.Token}";
+                        var uploadTarget = uploadRequestResponse.UploadTargets[0];
+                        var uploadTargetUrl = $"{uploadTarget.BareUrl}/{uploadTarget.Token}";
 
-                    dataPacketStream.Seek(0, SeekOrigin.Begin);
+                        dataPacketStream.Seek(0, SeekOrigin.Begin);
 
-                    await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
+                        await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
 
-                    onBlockProgress.Invoke(dataPacketStream.Position);
+                        onBlockProgress.Invoke(dataPacketStream.Position);
 
-                    return sha256Digest;
+                        return sha256Digest;
+                    }
                 }
             }
             finally

@@ -6,6 +6,7 @@ internal readonly struct PgpArmoredPublicKey(ReadOnlyMemory<byte> bytes) : IPgpA
 {
     public ReadOnlyMemory<byte> Bytes { get; } = bytes;
 
+    public static implicit operator PgpArmoredPublicKey(Memory<byte> bytes) => new(bytes);
     public static implicit operator PgpArmoredPublicKey(ReadOnlyMemory<byte> bytes) => new(bytes);
     public static implicit operator PgpArmoredPublicKey(ArraySegment<byte> bytes) => new(bytes);
 

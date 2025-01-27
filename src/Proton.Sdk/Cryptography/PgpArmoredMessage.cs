@@ -6,6 +6,7 @@ internal readonly struct PgpArmoredMessage(ReadOnlyMemory<byte> bytes) : IPgpArm
 {
     public ReadOnlyMemory<byte> Bytes { get; } = bytes;
 
+    public static implicit operator PgpArmoredMessage(Memory<byte> bytes) => new(bytes);
     public static implicit operator PgpArmoredMessage(ReadOnlyMemory<byte> bytes) => new(bytes);
     public static implicit operator PgpArmoredMessage(ArraySegment<byte> bytes) => new(bytes);
 
