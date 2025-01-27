@@ -1,0 +1,81 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33516.290
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proton.Sdk", "src\Proton.Sdk\Proton.Sdk.csproj", "{E1455CDC-77F6-4BAB-8F7A-AE61AF7AE108}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proton.Sdk.Drive", "src\Proton.Sdk.Drive\Proton.Sdk.Drive.csproj", "{EF63997D-7E8F-470C-9133-4CD94751D98C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SDK", "SDK", "{81787E6F-A6FD-48F6-BB23-D2A315256815}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Configuration", "Configuration", "{D8CC2C15-9176-4434-A44A-8C3C0AF9043E}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		.globalconfig = .globalconfig
+		Directory.Build.props = Directory.Build.props
+		Directory.Packages.props = Directory.Packages.props
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proton.Sdk.CExports", "src\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj", "{2DA5BC80-EA66-4B2F-BD98-87EAC587E733}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proton.Sdk.Drive.CExports", "src\Proton.Sdk.Drive.CExports\Proton.Sdk.Drive.CExports.csproj", "{4D920714-366C-4B3C-8132-DA2EA6BDE428}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proton.Sdk.Instrumentation", "src\Proton.Sdk.Instrumentation\Proton.Sdk.Instrumentation.csproj", "{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Proton.Sdk.Instrumentation.CExport", "src\Proton.Sdk.Instrumentation.CExport\Proton.Sdk.Instrumentation.CExport.csproj", "{4E5500E6-778E-44F4-AE67-B881D4197346}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{92DB46A4-575F-424F-800F-F4B22674FC78}"
+	ProjectSection(SolutionItems) = preProject
+		protos\account.proto = protos\account.proto
+		protos\drive.proto = protos\drive.proto
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E1455CDC-77F6-4BAB-8F7A-AE61AF7AE108}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1455CDC-77F6-4BAB-8F7A-AE61AF7AE108}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1455CDC-77F6-4BAB-8F7A-AE61AF7AE108}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1455CDC-77F6-4BAB-8F7A-AE61AF7AE108}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF63997D-7E8F-470C-9133-4CD94751D98C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF63997D-7E8F-470C-9133-4CD94751D98C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF63997D-7E8F-470C-9133-4CD94751D98C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF63997D-7E8F-470C-9133-4CD94751D98C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2DA5BC80-EA66-4B2F-BD98-87EAC587E733}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2DA5BC80-EA66-4B2F-BD98-87EAC587E733}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2DA5BC80-EA66-4B2F-BD98-87EAC587E733}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2DA5BC80-EA66-4B2F-BD98-87EAC587E733}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D920714-366C-4B3C-8132-DA2EA6BDE428}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D920714-366C-4B3C-8132-DA2EA6BDE428}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D920714-366C-4B3C-8132-DA2EA6BDE428}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D920714-366C-4B3C-8132-DA2EA6BDE428}.Release|Any CPU.Build.0 = Release|Any CPU
+		{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E5500E6-778E-44F4-AE67-B881D4197346}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E5500E6-778E-44F4-AE67-B881D4197346}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E5500E6-778E-44F4-AE67-B881D4197346}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E5500E6-778E-44F4-AE67-B881D4197346}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E1455CDC-77F6-4BAB-8F7A-AE61AF7AE108} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+		{EF63997D-7E8F-470C-9133-4CD94751D98C} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+		{2DA5BC80-EA66-4B2F-BD98-87EAC587E733} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+		{4D920714-366C-4B3C-8132-DA2EA6BDE428} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+		{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+		{4E5500E6-778E-44F4-AE67-B881D4197346} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+		{92DB46A4-575F-424F-800F-F4B22674FC78} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4B5CF797-DDDC-4513-A10C-BE0AE9FD1B8E}
+	EndGlobalSection
+EndGlobal

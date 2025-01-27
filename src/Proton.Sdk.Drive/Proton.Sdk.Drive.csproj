@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="../../protos/drive_types.proto" />
+    <Protobuf Include="../../protos/drive.proto" />
   </ItemGroup>
 
 </Project>

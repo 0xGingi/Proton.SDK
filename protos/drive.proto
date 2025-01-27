@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option csharp_namespace = "Proton.Sdk.Drive";
 
-import "proton_types.proto";
+import "account.proto";
 
 enum DevicePlatform {
     DEVICE_PLATFORM_INVALID = 0;

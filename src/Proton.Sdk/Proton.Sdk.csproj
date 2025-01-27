@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="../../protos/proton_types.proto" />
+    <Protobuf Include="../../protos/account.proto" />
   </ItemGroup>
 
 </Project>
