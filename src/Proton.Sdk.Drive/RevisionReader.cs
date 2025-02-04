@@ -1,5 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
+using Microsoft.Extensions.Logging;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Drive.Files;
 
@@ -122,10 +122,14 @@ public sealed class RevisionReader : IDisposable
         {
             var downloadResult = await downloadTask.ConfigureAwait(false);
 
-            if (downloadResult.VerificationStatus is not (PgpVerificationStatus.Ok or PgpVerificationStatus.NotSigned))
+            if (downloadResult.VerificationStatus is not PgpVerificationStatus.Ok)
             {
-                throw new CryptographicException(
-                    $"Verification failed for block #{downloadResult.Index} of file with ID \"{_fileIdentity.NodeId}\" on volume with ID \"{_fileIdentity.VolumeId}\": {downloadResult.VerificationStatus}");
+                _client.Logger.LogWarning(
+                    "Verification failed for block #{Index} of file with ID \"{NodeId}\" on volume with ID \"{VolumeId}\": {VerificationStatus}",
+                    downloadResult.Index,
+                    _fileIdentity.NodeId,
+                    _fileIdentity.VolumeId,
+                    downloadResult.VerificationStatus);
             }
 
             manifestStream.Write(downloadResult.Sha256Digest.Span);
