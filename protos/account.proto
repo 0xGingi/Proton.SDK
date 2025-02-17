@@ -52,8 +52,8 @@ enum UserType {
 
 message ProtonClientOptions {
     string app_version = 1;
-    string user_agent = 2;
-    string base_url = 3;
+    optional string user_agent = 2;
+    optional string base_url = 3;
     optional bool disable_tls_pinning = 4;
     optional bool ignore_ssl_certificate_errors = 5;
     optional int64 logger_provider_handle = 6;

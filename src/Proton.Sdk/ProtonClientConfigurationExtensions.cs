@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
@@ -78,9 +79,23 @@ internal static class ProtonClientConfigurationExtensions
                 builder.ConfigureHttpClient(
                     httpClient =>
                     {
+                        var executingAssembly = Assembly.GetExecutingAssembly();
+                        var versionAttribute = executingAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+                        var sdkVersion = versionAttribute?.InformationalVersion
+                            ?? executingAssembly.GetName().Version?.ToString(fieldCount: 3)
+                            ?? "0.0.0";
+
+                        var bindingsSuffix = config.BindingsLanguage is not null ? "-" + config.BindingsLanguage.ToLowerInvariant() : string.Empty;
+                        var sdkTechnicalStack = "dotnet" + bindingsSuffix;
+
                         httpClient.BaseAddress = new Uri(baseAddress);
                         httpClient.DefaultRequestHeaders.Add("x-pm-appversion", config.AppVersion);
-                        httpClient.DefaultRequestHeaders.Add("User-Agent", config.UserAgent);
+                        httpClient.DefaultRequestHeaders.Add("x-pm-drive-sdk-version", $"{sdkTechnicalStack}@{sdkVersion}");
+
+                        if (config.UserAgent is not null)
+                        {
+                            httpClient.DefaultRequestHeaders.Add("User-Agent", config.UserAgent);
+                        }
                     });
             });
 

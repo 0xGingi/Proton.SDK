@@ -59,8 +59,19 @@ Add a reference to the NuGet package in your project file:
 
 Start an authenticated API session:
 ```csharp
-var session = await ProtonApiSession.BeginAsync("[username]", "[password]"u8.ToArray(), cancellationToken);
+var sessionBeginRequest = new SessionBeginRequest
+{
+    Username = "{username}",
+    Password = "{password}",
+    Options = new() { AppVersion = "{platform}-drive-{appName}@{appVersion}" },
+};
+
+await ProtonApiSession.BeginAsync(sessionBeginRequest, CancellationToken.None);
 ```
+
+- `{platform}` can be `linux`, `windows`, `macos`, `android` or `ios`
+- `{appName}` is the name of your app in all lowercase with no space
+- `{version}` is the version of your app in Semantic Versioning 2.0 format
 
 Use that session to access the functionality exposed by `ProtonDriveClient`:
 ```csharp
@@ -69,7 +80,7 @@ var client = new ProtonDriveClient(session);
 var volumes = await client.GetVolumesAsync(cancellationToken);
 var mainVolume = volumes[0];
 var share = await client.GetShareAsync(mainVolume.RootShareId, cancellationToken);
-var children = client.GetFolderChildrenAsync(share.Id, mainVolume.Id, share.RootNodeId, cancellationToken);
+var children = client.GetFolderChildrenAsync(new NodeIdentity(share.ShareId, mainVolume.Id, share.RootNodeId), cancellationToken);
 
 await foreach (var child in children)
 {

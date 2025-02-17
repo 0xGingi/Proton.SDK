@@ -6,9 +6,10 @@ namespace Proton.Sdk;
 
 internal sealed class ProtonClientConfiguration(ProtonClientOptions options)
 {
-    public string BaseUrl { get; } = options.BaseUrl ?? ProtonApiDefaults.BaseUrl.AbsolutePath;
-    public string AppVersion { get; } = options.AppVersion ?? string.Empty;
-    public string UserAgent { get; } = options.UserAgent ?? string.Empty;
+    public string AppVersion { get; } = options.AppVersion;
+    public string BaseUrl { get; } = options.HasBaseUrl ? options.BaseUrl : ProtonApiDefaults.BaseUrl.ToString();
+    public string? UserAgent { get; } = options.HasUserAgent ? options.UserAgent : null;
+    public string? BindingsLanguage { get; } = options.BindingsLanguage;
     public bool DisableTlsPinning { get; } = options.HasDisableTlsPinning && options.DisableTlsPinning;
     public bool IgnoreSslCertificateErrors { get; } = options.HasIgnoreSslCertificateErrors && options.IgnoreSslCertificateErrors;
     public ISecretsCache SecretsCache { get; } = options.SecretsCache ?? new InMemorySecretsCache();

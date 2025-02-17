@@ -99,6 +99,8 @@ internal static class InteropProtonApiSession
                 key => onSecretRequested.Invoke(key.ToCacheMissMessage()),
                 sessionResumeRequest.Options.LoggerFactory);
 
+            sessionResumeRequest.Options.BindingsLanguage = "C";
+
             var session = ProtonApiSession.Resume(sessionResumeRequest);
             *sessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
             return 0;
@@ -258,6 +260,8 @@ internal static class InteropProtonApiSession
                 new InMemorySecretsCache(),
                 key => onSecretRequested.Invoke(key.ToCacheMissMessage()),
                 sessionBeginRequest.Options.LoggerFactory);
+
+            sessionBeginRequest.Options.BindingsLanguage = "C";
 
             var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken).ConfigureAwait(false);
 
