@@ -270,7 +270,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(e, InteropErrorConverter.SetDomainAndCodes);
         }
     }
 
@@ -284,7 +284,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(e, InteropErrorConverter.SetDomainAndCodes);
         }
     }
 

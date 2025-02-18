@@ -231,7 +231,16 @@ public class Node : INode
             secretsCache,
             cancellationToken).ConfigureAwait(false);
 
-        using var key = PgpPrivateKey.ImportAndUnlock(link.Key, passphrase);
+        PgpPrivateKey key;
+        try
+        {
+            key = PgpPrivateKey.ImportAndUnlock(link.Key, passphrase);
+        }
+        catch (Exception e)
+        {
+            throw new NodeMetadataDecryptionException(NodeMetadataPart.Key, e);
+        }
+
         secretsCache.Set(GetNodeKeyCacheKey(volumeId, nodeId), key.ToBytes());
 
         var hashKeyAndContentKeyVerificationKeyRing =
@@ -335,28 +344,49 @@ public class Node : INode
         ISecretsCache? secretsCache,
         CancellationToken cancellationToken)
     {
-        using var sessionKey = parentKey.DecryptSessionKey(encryptedName);
-        secretsCache?.Set(GetNameSessionKeyCacheKey(volumeId, nodeId), sessionKey.Export().Token);
-
-        PgpKeyRing verificationKeyRing;
-        if (!string.IsNullOrEmpty(signatureEmailAddress))
+        PgpSessionKey sessionKey;
+        try
         {
-            var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
-            verificationKeyRing = new PgpKeyRing(verificationKeys);
+            sessionKey = parentKey.DecryptSessionKey(encryptedName);
         }
-        else
+        catch (CryptographicException e)
         {
-            verificationKeyRing = new PgpKeyRing(parentKey);
+            throw new NodeMetadataDecryptionException(NodeMetadataPart.Name, e);
         }
 
-        var name = sessionKey.DecryptAndVerifyText(encryptedName, verificationKeyRing, out var verificationResult);
-
-        if (verificationResult.Status is not PgpVerificationStatus.Ok)
+        using (sessionKey)
         {
-            client.Logger.LogWarning("Signature verification failed for name (volume ID: {VolumeId}, file ID: {NodeId})", volumeId, nodeId);
-        }
+            secretsCache?.Set(GetNameSessionKeyCacheKey(volumeId, nodeId), sessionKey.Export().Token);
 
-        return name;
+            PgpKeyRing verificationKeyRing;
+            if (!string.IsNullOrEmpty(signatureEmailAddress))
+            {
+                var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
+                verificationKeyRing = new PgpKeyRing(verificationKeys);
+            }
+            else
+            {
+                verificationKeyRing = new PgpKeyRing(parentKey);
+            }
+
+            string name;
+            PgpVerificationResult verificationResult;
+            try
+            {
+                name = sessionKey.DecryptAndVerifyText(encryptedName, verificationKeyRing, out verificationResult);
+            }
+            catch (CryptographicException e)
+            {
+                throw new NodeMetadataDecryptionException(NodeMetadataPart.Name, e);
+            }
+
+            if (verificationResult.Status is not PgpVerificationStatus.Ok)
+            {
+                client.Logger.LogWarning("Signature verification failed for name (volume ID: {VolumeId}, file ID: {NodeId})", volumeId, nodeId);
+            }
+
+            return name;
+        }
     }
 
     internal static async Task<PgpKeyRing> GetNodeAndAddressVerificationKeyRingAsync(
@@ -387,42 +417,68 @@ public class Node : INode
         ISecretsCache secretsCache,
         CancellationToken cancellationToken)
     {
-        using var sessionKey = parentKey.DecryptSessionKey(encryptedPassphrase);
-        secretsCache.Set(GetPassphraseSessionKeyCacheKey(volumeId, nodeId), sessionKey.Export().Token);
-
-        ArraySegment<byte> passphrase;
-        if (signature is null)
+        PgpSessionKey sessionKey;
+        try
         {
-            client.Logger.LogWarning("Missing passphrase signature (volume ID: {VolumeId}, node ID: {NodeId})", volumeId, nodeId);
-
-            passphrase = sessionKey.Decrypt(encryptedPassphrase);
+            sessionKey = parentKey.DecryptSessionKey(encryptedPassphrase);
         }
-        else
+        catch (CryptographicException e)
         {
-            PgpKeyRing verificationKeyRing;
-            if (!string.IsNullOrEmpty(signatureEmailAddress))
+            throw new NodeMetadataDecryptionException(NodeMetadataPart.Passphrase, e);
+        }
+
+        using (sessionKey)
+        {
+            secretsCache.Set(GetPassphraseSessionKeyCacheKey(volumeId, nodeId), sessionKey.Export().Token);
+
+            ArraySegment<byte> passphrase;
+            if (signature is null)
             {
-                var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
-                verificationKeyRing = new PgpKeyRing(verificationKeys);
+                client.Logger.LogWarning("Missing passphrase signature (volume ID: {VolumeId}, node ID: {NodeId})", volumeId, nodeId);
+
+                try
+                {
+                    passphrase = sessionKey.Decrypt(encryptedPassphrase);
+                }
+                catch (CryptographicException e)
+                {
+                    throw new NodeMetadataDecryptionException(NodeMetadataPart.Passphrase, e);
+                }
             }
             else
             {
-                verificationKeyRing = new PgpKeyRing(parentKey);
+                PgpKeyRing verificationKeyRing;
+                if (!string.IsNullOrEmpty(signatureEmailAddress))
+                {
+                    var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
+                    verificationKeyRing = new PgpKeyRing(verificationKeys);
+                }
+                else
+                {
+                    verificationKeyRing = new PgpKeyRing(parentKey);
+                }
+
+                try
+                {
+                    passphrase = sessionKey.DecryptAndVerify(
+                        encryptedPassphrase,
+                        signature.Value.Bytes.Span,
+                        verificationKeyRing,
+                        out var verificationResult);
+
+                    if (verificationResult.Status is not PgpVerificationStatus.Ok)
+                    {
+                        client.Logger.LogWarning("Signature verification failed for passphrase (volume ID: {VolumeId}, node ID: {NodeId})", volumeId, nodeId);
+                    }
+                }
+                catch (CryptographicException e)
+                {
+                    throw new NodeMetadataDecryptionException(NodeMetadataPart.Passphrase, e);
+                }
             }
 
-            passphrase = sessionKey.DecryptAndVerify(
-                encryptedPassphrase,
-                signature.Value.Bytes.Span,
-                verificationKeyRing,
-                out var verificationResult);
-
-            if (verificationResult.Status is not PgpVerificationStatus.Ok)
-            {
-                client.Logger.LogWarning("Signature verification failed for passphrase (volume ID: {VolumeId}, node ID: {NodeId})", volumeId, nodeId);
-            }
+            return passphrase;
         }
-
-        return passphrase;
     }
 
     private static void GetNameParameters(

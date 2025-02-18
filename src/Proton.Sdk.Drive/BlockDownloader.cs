@@ -35,24 +35,40 @@ internal sealed class BlockDownloader
         var hashingStream = new CryptoStream(blobStream, sha256, CryptoStreamMode.Read);
 
         // TODO: use array pool for decrypted signature
-        var signature = encryptedSignature is not null ? signatureDecryptionKey.Decrypt(encryptedSignature.Value.Span) : default(ArraySegment<byte>?);
+        ArraySegment<byte>? signature;
+
+        try
+        {
+            signature = encryptedSignature is not null ? (ArraySegment<byte>?)signatureDecryptionKey.Decrypt(encryptedSignature.Value.Span) : null;
+        }
+        catch (CryptographicException e)
+        {
+            throw new NodeMetadataDecryptionException(NodeMetadataPart.BlockSignature, e);
+        }
 
         PgpVerificationStatus verificationStatus;
 
-        await using (hashingStream.ConfigureAwait(false))
+        try
         {
-            var decryptingStream = signature is not null
-                ? contentKey.OpenDecryptingAndVerifyingStream(hashingStream, signature.Value, verificationKeyRing)
-                : contentKey.OpenDecryptingStream(hashingStream);
-
-            await using (decryptingStream.ConfigureAwait(false))
+            await using (hashingStream.ConfigureAwait(false))
             {
-                await decryptingStream.CopyToAsync(outputStream, cancellationToken).ConfigureAwait(false);
+                var decryptingStream = signature is not null
+                    ? contentKey.OpenDecryptingAndVerifyingStream(hashingStream, signature.Value, verificationKeyRing)
+                    : contentKey.OpenDecryptingStream(hashingStream);
 
-                using var verificationResult = decryptingStream.GetVerificationResult();
+                await using (decryptingStream.ConfigureAwait(false))
+                {
+                    await decryptingStream.CopyToAsync(outputStream, cancellationToken).ConfigureAwait(false);
 
-                verificationStatus = verificationResult.Status;
+                    using var verificationResult = decryptingStream.GetVerificationResult();
+
+                    verificationStatus = verificationResult.Status;
+                }
             }
+        }
+        catch (CryptographicException e)
+        {
+            throw new FileContentsDecryptionException(e);
         }
 
         sha256.TransformFinalBlock([], 0, 0);

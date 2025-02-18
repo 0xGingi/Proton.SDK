@@ -150,7 +150,17 @@ public sealed partial class FolderNode : INode
         PgpKeyRing verificationKeyRing,
         ISecretsCache secretsCache)
     {
-        var hashKey = nodeKey.DecryptAndVerify(encryptedHashKey, verificationKeyRing, out var verificationResult);
+        ArraySegment<byte> hashKey;
+        PgpVerificationResult verificationResult;
+        try
+        {
+            hashKey = nodeKey.DecryptAndVerify(encryptedHashKey, verificationKeyRing, out verificationResult);
+        }
+        catch (CryptographicException e)
+        {
+            throw new NodeMetadataDecryptionException(NodeMetadataPart.HashKey, e);
+        }
+
         secretsCache.Set(GetHashKeyCacheKey(volumeId, folderId), hashKey);
 
         if (verificationResult.Status is not PgpVerificationStatus.Ok)

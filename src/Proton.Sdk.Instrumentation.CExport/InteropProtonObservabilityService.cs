@@ -155,7 +155,7 @@ internal static class InteropProtonObservabilityService
         }
         catch (Exception exception)
         {
-            return ResultExtensions.Failure(exception);
+            return ResultExtensions.Failure(exception, InteropErrorConverter.SetDomainAndCodes);
         }
     }
 }

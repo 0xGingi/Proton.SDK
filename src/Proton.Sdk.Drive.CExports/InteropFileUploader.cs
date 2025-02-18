@@ -123,7 +123,7 @@ internal static class InteropFileUploader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(e, InteropDriveErrorConverter.SetDomainAndCodes);
         }
     }
 
@@ -171,7 +171,7 @@ internal static class InteropFileUploader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(e, InteropDriveErrorConverter.SetDomainAndCodes);
         }
     }
 
@@ -218,7 +218,7 @@ internal static class InteropFileUploader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(e, InteropDriveErrorConverter.SetDomainAndCodes);
         }
     }
 }

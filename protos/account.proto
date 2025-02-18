@@ -139,6 +139,7 @@ enum ErrorDomain {
     Transport = 4;
     Serialization = 5;
     Cryptography = 6;
+    DataIntegrity = 7;
 }
 
 message Error {

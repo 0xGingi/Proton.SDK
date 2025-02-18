@@ -99,7 +99,7 @@ internal static class InteropFileDownloader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(e, InteropDriveErrorConverter.SetDomainAndCodes);
         }
     }
 
@@ -125,7 +125,7 @@ internal static class InteropFileDownloader
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(e, InteropDriveErrorConverter.SetDomainAndCodes);
         }
     }
 }

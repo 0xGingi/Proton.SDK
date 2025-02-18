@@ -58,7 +58,7 @@ internal static class InteropNode
         }
         catch (Exception e)
         {
-            return ResultExtensions.Failure(e);
+            return ResultExtensions.Failure(e, InteropDriveErrorConverter.SetDomainAndCodes);
         }
     }
 }

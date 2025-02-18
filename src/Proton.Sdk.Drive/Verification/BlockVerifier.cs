@@ -26,10 +26,17 @@ internal sealed class BlockVerifier
         PgpPrivateKey key,
         CancellationToken cancellationToken)
     {
-        var verificationInput = await client.GetVerificationInputAsync(shareId, linkId, revisionId, cancellationToken)
-            .ConfigureAwait(false);
+        var verificationInput = await client.GetVerificationInputAsync(shareId, linkId, revisionId, cancellationToken).ConfigureAwait(false);
 
-        var sessionKey = key.DecryptSessionKey(verificationInput.ContentKeyPacket.Span);
+        PgpSessionKey sessionKey;
+        try
+        {
+            sessionKey = key.DecryptSessionKey(verificationInput.ContentKeyPacket.Span);
+        }
+        catch (Exception e)
+        {
+            throw new NodeKeyAndSessionKeyMismatchException(e);
+        }
 
         return new BlockVerifier(sessionKey, verificationInput.VerificationCode);
     }

@@ -37,9 +37,9 @@ public struct ResultExtensions
         return Failure(defaultCode, exception.Message);
     }
 
-    internal static Result<InteropArray, InteropArray> Failure(Exception exception)
+    internal static Result<InteropArray, InteropArray> Failure(Exception exception, Action<Error, Exception> setDomainAndCodesFunction)
     {
-        var error = exception.ToInteropError();
+        var error = exception.ToInteropError(setDomainAndCodesFunction);
 
         return new Result<InteropArray, InteropArray>(error: InteropArray.FromMemory(error.ToByteArray()));
     }

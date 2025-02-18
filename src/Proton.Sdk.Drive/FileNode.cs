@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using Google.Protobuf;
 using Microsoft.Extensions.Logging;
@@ -248,7 +249,16 @@ public sealed partial class FileNode : INode
             verificationKeyRing = new PgpKeyRing(fileKey);
         }
 
-        var serializedExtendedAttributes = fileKey.DecryptAndVerify(encryptedExtendedAttributes.Value, verificationKeyRing, out var verificationResult);
+        ArraySegment<byte> serializedExtendedAttributes;
+        PgpVerificationResult verificationResult;
+        try
+        {
+            serializedExtendedAttributes = fileKey.DecryptAndVerify(encryptedExtendedAttributes.Value, verificationKeyRing, out verificationResult);
+        }
+        catch (CryptographicException e)
+        {
+            throw new NodeMetadataDecryptionException(NodeMetadataPart.ExtendedAttributes, e);
+        }
 
         if (verificationResult.Status is not PgpVerificationStatus.Ok)
         {
@@ -289,7 +299,16 @@ public sealed partial class FileNode : INode
         PgpKeyRing verificationKeyRing,
         ISecretsCache secretsCache)
     {
-        var contentKey = nodeKey.DecryptSessionKey(contentKeyPacket.Span);
+        PgpSessionKey contentKey;
+        try
+        {
+            contentKey = nodeKey.DecryptSessionKey(contentKeyPacket.Span);
+        }
+        catch (CryptographicException e)
+        {
+            throw new NodeMetadataDecryptionException(NodeMetadataPart.ContentKey, e);
+        }
+
         secretsCache.Set(GetContentKeyCacheKey(volumeId, fileId), contentKey.Export().Token);
 
         if (contentKeySignature is null)
