@@ -54,6 +54,7 @@ int session_begin(
     ByteArray pointer, // SessionBeginRequest
     Callback request_response_body_callback,
     BooleanCallback secret_requested_callback,
+    Callback tokens_refreshed_callback,
     AsyncCallback callback
 );
 
@@ -61,12 +62,14 @@ int session_resume(
     ByteArray pointer, // SessionResumeRequest
     Callback request_response_body_callback,
     BooleanCallback secret_requested_callback,
+    Callback tokens_refreshed_callback,
     intptr_t* session_handle // TODO: SessionResumeResponse
 );
 
 int session_renew(
     intptr_t old_session_handle,
     ByteArray pointer, // SessionRenewRequest
+    Callback tokens_refreshed_callback,
     intptr_t* new_session_handle // TODO: SessionRenewResponse
 );
 

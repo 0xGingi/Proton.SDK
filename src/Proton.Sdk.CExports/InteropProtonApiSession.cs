@@ -33,6 +33,7 @@ internal static class InteropProtonApiSession
         InteropArray sessionBeginRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
         InteropSecretRequestedCallback secretRequestedCallback,
+        InteropTokensRefreshedCallback tokensRefreshedCallback,
         InteropAsyncCallback callback)
     {
         try
@@ -52,7 +53,8 @@ internal static class InteropProtonApiSession
                     }
                 });
 
-            return callback.InvokeFor(ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, onSecretRequested, ct));
+            return callback.InvokeFor(
+                ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, onSecretRequested, tokensRefreshedCallback, ct));
         }
         catch
         {
@@ -65,6 +67,7 @@ internal static class InteropProtonApiSession
         InteropArray sessionResumeRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
         InteropSecretRequestedCallback secretRequestedCallback,
+        InteropTokensRefreshedCallback tokensRefreshedCallback,
         nint* sessionHandle)
     {
         try
@@ -101,7 +104,12 @@ internal static class InteropProtonApiSession
 
             sessionResumeRequest.Options.BindingsLanguage = "C";
 
-            var session = ProtonApiSession.Resume(sessionResumeRequest);
+            var session = ProtonApiSession.Resume(
+                sessionResumeRequest);
+
+            session.TokenCredential.TokensRefreshed += (accessToken, refreshToken) =>
+                tokensRefreshedCallback.TokensRefreshed(accessToken, refreshToken);
+
             *sessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
             return 0;
         }
@@ -115,6 +123,7 @@ internal static class InteropProtonApiSession
     private static unsafe int NativeRenew(
         nint oldSessionHandle,
         InteropArray sessionRenewRequestBytes,
+        InteropTokensRefreshedCallback tokensRefreshedCallback,
         nint* newSessionHandle)
     {
         try
@@ -129,6 +138,9 @@ internal static class InteropProtonApiSession
             var session = ProtonApiSession.Renew(
                 expiredSession,
                 sessionRenewRequest);
+
+            session.TokenCredential.TokensRefreshed += (accessToken, refreshToken) =>
+                tokensRefreshedCallback.TokensRefreshed(accessToken, refreshToken);
 
             *newSessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
 
@@ -242,6 +254,7 @@ internal static class InteropProtonApiSession
         InteropArray sessionBeginRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
         Func<KeyCacheMissMessage, bool> onSecretRequested,
+        InteropTokensRefreshedCallback tokensRefreshedCallback,
         CancellationToken cancellationToken)
     {
         try
@@ -263,7 +276,12 @@ internal static class InteropProtonApiSession
 
             sessionBeginRequest.Options.BindingsLanguage = "C";
 
-            var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken).ConfigureAwait(false);
+            var session = await ProtonApiSession.BeginAsync(
+                sessionBeginRequest,
+                cancellationToken).ConfigureAwait(false);
+
+            session.TokenCredential.TokensRefreshed += (accessToken, refreshToken) =>
+                tokensRefreshedCallback.TokensRefreshed(accessToken, refreshToken);
 
             var handle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
             return ResultExtensions.Success(new IntResponse { Value = handle });

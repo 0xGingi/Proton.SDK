@@ -90,6 +90,11 @@ message SessionEndRequest {
     int64 session_handle = 1;
 }
 
+message SessionTokens {
+    string access_token = 1;
+    string refresh_token = 2;
+}
+
 // Events
 
 message LogEvent {

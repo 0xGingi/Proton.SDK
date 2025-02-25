@@ -15,7 +15,7 @@ internal sealed class AuthorizationHandler(ProtonApiSession session) : Delegatin
     {
         request.Headers.Add(SessionIdHeaderName, _session.SessionId.Value);
 
-        var accessToken = await _session.TokenCredential.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+        var (accessToken, _) = await _session.TokenCredential.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
 
         var response = await SendWithTokenAsync(request, accessToken, cancellationToken).ConfigureAwait(false);
 

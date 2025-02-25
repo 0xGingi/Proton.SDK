@@ -134,7 +134,8 @@ public sealed class ProtonApiSession
         return session;
     }
 
-    public static ProtonApiSession Resume(SessionResumeRequest sessionResumeRequest)
+    public static ProtonApiSession Resume(
+        SessionResumeRequest sessionResumeRequest)
     {
         var configuration = new ProtonClientConfiguration(sessionResumeRequest.Options);
 
