@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 using Proton.Sdk.Instrumentation.Extensions;
 using Proton.Sdk.Instrumentation.Metrics;
 
@@ -11,6 +12,7 @@ public sealed class ObservabilityService : Meter, IObservabilityService
     private readonly ObservabilityApiClient _observabilityApiClient;
     private readonly TimeSpan _period;
     private readonly ConcurrentBag<InstrumentRegistration> _instrumentRegistrations = new();
+    private readonly ILogger _logger;
 
     private CancellationTokenSource _cancellationTokenSource = new();
     private PeriodicTimer _timer;
@@ -18,6 +20,9 @@ public sealed class ObservabilityService : Meter, IObservabilityService
 
     public ObservabilityService(ProtonApiSession session)
     {
+        _logger = session.LoggerFactory.CreateLogger<ObservabilityService>();
+        _logger.LogDebug("Creating observability service");
+
         _observabilityApiClient = new ObservabilityApiClient(session.GetHttpClient(ProtonInstrumentationDefaults.ObservabilityBaseRoute));
         _period = JitterGenerator.ApplyJitter(ProtonInstrumentationDefaults.DefaultReportingInterval, 0.2);
         _timer = new PeriodicTimer(_period);
@@ -32,16 +37,22 @@ public sealed class ObservabilityService : Meter, IObservabilityService
 
     public void Start()
     {
+        _logger.LogDebug("Observability service starting...");
+
         if (_timerTask is not null)
         {
             return;
         }
 
         _timerTask = PeriodicallySendMetricsAsync(_cancellationTokenSource.Token);
+
+        _logger.LogDebug("Observability service started");
     }
 
     public void Stop()
     {
+        _logger.LogDebug("Observability service stopping...");
+
         if (_timerTask is null)
         {
             return;
@@ -51,11 +62,17 @@ public sealed class ObservabilityService : Meter, IObservabilityService
         _cancellationTokenSource = new CancellationTokenSource();
         _timer.Dispose();
         _timer = new PeriodicTimer(_period);
+
+        _logger.LogDebug("Observability service stopped");
     }
 
     public async ValueTask FlushAsync(CancellationToken cancellationToken)
     {
+        _logger.LogDebug("Observability service flushing...");
+
         await SendMetricsAsync(cancellationToken).ConfigureAwait(false);
+
+        _logger.LogDebug("Observability service flushed");
     }
 
     public override ICounter CreateCounter(string name, int version, JsonNode labels)
@@ -91,17 +108,22 @@ public sealed class ObservabilityService : Meter, IObservabilityService
                 return;
             }
 
+            _logger.LogDebug("Observability service is sending metrics...");
+
             var metrics = new ObservabilityMetricsParameters(uploadMetrics);
 
             await _observabilityApiClient.SendMetricsAsync(metrics, cancellationToken).ConfigureAwait(false);
+
+            _logger.LogDebug($"Observability service sent {metrics.Metrics.Count} metric(s)");
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch
+        catch (Exception ex)
         {
             // Ignore failure
+            _logger.LogError($"Observability service failed to send metrics: {ex.Message}");
         }
         finally
         {

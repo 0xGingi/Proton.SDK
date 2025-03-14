@@ -10,7 +10,7 @@ internal readonly struct ObservabilityApiClient(HttpClient httpClient)
     {
         return await _httpClient
             .Expecting(ProtonInstrumentationApiSerializerContext.Default.ApiResponse)
-            .PostAsync("/data/v1/metrics", metricsParameters, ProtonInstrumentationApiSerializerContext.Default.ObservabilityMetricsParameters, cancellationToken)
+            .PostAsync("v1/metrics", metricsParameters, ProtonInstrumentationApiSerializerContext.Default.ObservabilityMetricsParameters, cancellationToken)
             .ConfigureAwait(false);
     }
 }
