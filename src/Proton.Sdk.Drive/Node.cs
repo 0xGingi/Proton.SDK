@@ -294,7 +294,7 @@ public class Node : INode
                 nodeId,
                 new RevisionId(fileProperties.ActiveRevision.Id),
                 key,
-                fileProperties.ActiveRevision.ExtendedAttributes,
+                link.ExtendedAttributes,
                 fileProperties.ActiveRevision.SignatureEmailAddress,
                 cancellationToken).ConfigureAwait(false);
 

@@ -91,52 +91,53 @@ public sealed class RevisionWriter : IDisposable
                         uploadTasks.Enqueue(uploadTask);
                     }
 
-                    do
+                    if (contentInputStream.Length > 0)
                     {
-                        var plainDataPrefix = ArrayPool<byte>.Shared.Rent(blockVerifier.DataPacketPrefixMaxLength);
-                        try
+                        do
                         {
-                            var plainDataStream = ProtonDriveClient.MemoryStreamManager.GetStream();
+                            var plainDataPrefix = ArrayPool<byte>.Shared.Rent(blockVerifier.DataPacketPrefixMaxLength);
+                            try
+                            {
+                                var plainDataStream = ProtonDriveClient.MemoryStreamManager.GetStream();
 
-                            await contentInputStream.PartiallyCopyToAsync(plainDataStream, _targetBlockSize, plainDataPrefix, cancellationToken)
-                                .ConfigureAwait(false);
+                                await contentInputStream.PartiallyCopyToAsync(plainDataStream, _targetBlockSize, plainDataPrefix, cancellationToken)
+                                    .ConfigureAwait(false);
 
-                            blockSizes.Add((int)plainDataStream.Length);
+                                blockSizes.Add((int)plainDataStream.Length);
 
-                            await WaitForBlockUploaderAsync(uploadTasks, manifestStream, cancellationToken).ConfigureAwait(false);
+                                await WaitForBlockUploaderAsync(uploadTasks, manifestStream, cancellationToken).ConfigureAwait(false);
 
-                            plainDataStream.Seek(0, SeekOrigin.Begin);
+                                plainDataStream.Seek(0, SeekOrigin.Begin);
 
-                            var uploadTask = _client.BlockUploader.UploadAsync(
-                                _shareMetadata,
-                                _fileId,
-                                _revisionId,
-                                ++blockIndex,
-                                _contentKey,
-                                _signingKey,
-                                _fileKey,
-                                plainDataStream,
-                                blockVerifier,
-                                plainDataPrefix,
-                                (int)Math.Min(blockVerifier.DataPacketPrefixMaxLength, plainDataStream.Length),
-                                (progress) =>
-                                {
-                                    numberOfBytesUploaded += progress;
-                                    onProgress(numberOfBytesUploaded, contentInputStream.Length);
-                                },
-                                _releaseBlocksAction,
-                                cancellationToken);
+                                var uploadTask = _client.BlockUploader.UploadAsync(
+                                    _shareMetadata,
+                                    _fileId,
+                                    _revisionId,
+                                    ++blockIndex,
+                                    _contentKey,
+                                    _signingKey,
+                                    _fileKey,
+                                    plainDataStream,
+                                    blockVerifier,
+                                    plainDataPrefix,
+                                    (int)Math.Min(blockVerifier.DataPacketPrefixMaxLength, plainDataStream.Length),
+                                    (progress) =>
+                                    {
+                                        numberOfBytesUploaded += progress;
+                                        onProgress(numberOfBytesUploaded, contentInputStream.Length);
+                                    },
+                                    _releaseBlocksAction,
+                                    cancellationToken);
 
-                            uploadTasks.Enqueue(uploadTask);
-                        }
-                        catch
-                        {
-                            ArrayPool<byte>.Shared.Return(plainDataPrefix);
-                            throw;
-                        }
-                    } while (contentInputStream.Position < contentInputStream.Length);
-
-                    // TODO: upload samples
+                                uploadTasks.Enqueue(uploadTask);
+                            }
+                            catch
+                            {
+                                ArrayPool<byte>.Shared.Return(plainDataPrefix);
+                                throw;
+                            }
+                        } while (contentInputStream.Position < contentInputStream.Length);
+                    }
                 }
                 finally
                 {

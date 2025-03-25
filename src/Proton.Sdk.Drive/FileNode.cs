@@ -239,10 +239,19 @@ public sealed partial class FileNode : INode
         }
 
         PgpKeyRing verificationKeyRing;
+
         if (!string.IsNullOrEmpty(signatureEmailAddress))
         {
-            var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
-            verificationKeyRing = new PgpKeyRing(verificationKeys);
+            try
+            {
+                var verificationKeys = await client.Account.GetAddressPublicKeysAsync(signatureEmailAddress, cancellationToken).ConfigureAwait(false);
+                verificationKeyRing = new PgpKeyRing(verificationKeys);
+            }
+            catch (Exception e)
+            {
+                verificationKeyRing = default;
+                client.Logger.LogError(e, "Failed to get address public keys for extended attributes verification");
+            }
         }
         else
         {
