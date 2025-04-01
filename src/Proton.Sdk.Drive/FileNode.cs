@@ -209,7 +209,9 @@ public sealed partial class FileNode : INode
             (token, _) => PgpSessionKey.Import(token, SymmetricCipher.Aes256),
             out var nameKey))
         {
+            client.Logger.LogInformation("Cache miss for content key of {NodeId}", nodeIdentity.NodeId.Value);
             await Node.GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken, operationId).ConfigureAwait(false);
+            client.Logger.LogInformation("Fetched info for {NodeId}", nodeIdentity.NodeId.Value);
 
             if (!client.SecretsCache.TryUse(
                 GetContentKeyCacheKey(nodeIdentity.VolumeId, nodeIdentity.NodeId),
@@ -319,6 +321,7 @@ public sealed partial class FileNode : INode
         }
 
         secretsCache.Set(GetContentKeyCacheKey(volumeId, fileId), contentKey.Export().Token);
+        client.Logger.LogDebug("Decrypted content key for {LinkId} and added it to cache", fileId.Value);
 
         if (contentKeySignature is null)
         {

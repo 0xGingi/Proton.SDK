@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Google.Protobuf;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.CExports.Logging;
 using Proton.Sdk.Cryptography;
@@ -38,8 +39,8 @@ internal static class InteropProtonApiSession
     {
         try
         {
-            var onSecretRequested = new Func<KeyCacheMissMessage, bool>(
-                keyCacheMissMessage =>
+            var onSecretRequested = secretRequestedCallback.OnSecretRequested != null && secretRequestedCallback.State != null
+                ? new Func<KeyCacheMissMessage, bool>(keyCacheMissMessage =>
                 {
                     var messageBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
 
@@ -51,7 +52,8 @@ internal static class InteropProtonApiSession
                     {
                         messageBytes.Free();
                     }
-                });
+                })
+                : null;
 
             return callback.InvokeFor(
                 ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, onSecretRequested, tokensRefreshedCallback, ct));
@@ -72,8 +74,8 @@ internal static class InteropProtonApiSession
     {
         try
         {
-            var onSecretRequested = new Func<KeyCacheMissMessage, bool>(
-                keyCacheMissMessage =>
+            var onSecretRequested = secretRequestedCallback.OnSecretRequested != null && secretRequestedCallback.State != null
+                ? new Func<KeyCacheMissMessage, bool>(keyCacheMissMessage =>
                 {
                     var messageBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
 
@@ -85,7 +87,8 @@ internal static class InteropProtonApiSession
                     {
                         messageBytes.Free();
                     }
-                });
+                })
+                : null;
 
             var sessionResumeRequest = SessionResumeRequest.Parser.ParseFrom(sessionResumeRequestBytes.AsReadOnlySpan());
 
@@ -97,10 +100,13 @@ internal static class InteropProtonApiSession
             sessionResumeRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(
                 requestResponseBodyCallback);
 
-            sessionResumeRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
-                new InMemorySecretsCache(),
-                key => onSecretRequested.Invoke(key.ToCacheMissMessage()),
-                sessionResumeRequest.Options.LoggerFactory);
+            var cacheLogger = sessionResumeRequest.Options.LoggerFactory?.CreateLogger<InMemorySecretsCache>() ?? NullLogger<InMemorySecretsCache>.Instance;
+            sessionResumeRequest.Options.SecretsCache = onSecretRequested is not null
+                ? new InteropFallbackSecretsCacheDecorator(
+                    new InMemorySecretsCache(cacheLogger),
+                    key => onSecretRequested.Invoke(key.ToCacheMissMessage()),
+                    sessionResumeRequest.Options.LoggerFactory)
+                : new InMemorySecretsCache(cacheLogger);
 
             sessionResumeRequest.Options.BindingsLanguage = "C";
 
@@ -253,7 +259,7 @@ internal static class InteropProtonApiSession
     private static async ValueTask<Result<InteropArray, InteropArray>> InteropBeginAsync(
         InteropArray sessionBeginRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
-        Func<KeyCacheMissMessage, bool> onSecretRequested,
+        Func<KeyCacheMissMessage, bool>? onSecretRequested,
         InteropTokensRefreshedCallback tokensRefreshedCallback,
         CancellationToken cancellationToken)
     {
@@ -269,10 +275,13 @@ internal static class InteropProtonApiSession
 
             sessionBeginRequest.Options.CustomHttpMessageHandlerFactory = () => ResponsePassingHttpHandler.Create(requestResponseBodyCallback);
 
-            sessionBeginRequest.Options.SecretsCache = new InteropFallbackSecretsCacheDecorator(
-                new InMemorySecretsCache(),
-                key => onSecretRequested.Invoke(key.ToCacheMissMessage()),
-                sessionBeginRequest.Options.LoggerFactory);
+            var cacheLogger = sessionBeginRequest.Options.LoggerFactory?.CreateLogger<InMemorySecretsCache>() ?? NullLogger<InMemorySecretsCache>.Instance;
+            sessionBeginRequest.Options.SecretsCache = onSecretRequested is not null ?
+                new InteropFallbackSecretsCacheDecorator(
+                    new InMemorySecretsCache(cacheLogger),
+                    key => onSecretRequested.Invoke(key.ToCacheMissMessage()),
+                    sessionBeginRequest.Options.LoggerFactory)
+                : new InMemorySecretsCache(cacheLogger);
 
             sessionBeginRequest.Options.BindingsLanguage = "C";
 

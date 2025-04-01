@@ -71,12 +71,17 @@ public sealed class RevisionWriter : IDisposable
         ArraySegment<byte> manifestSignature;
         var blockSizes = new List<int>(8);
 
-        using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
         await using (manifestStream.ConfigureAwait(false))
         {
-            var blockVerifier = await BlockVerifier.CreateAsync(_client.RevisionVerificationApi, _shareMetadata.ShareId, _fileId, _revisionId, _fileKey, cancellationToken)
-                .ConfigureAwait(false);
+            var blockVerifier = await BlockVerifier.CreateAsync(
+                _client.RevisionVerificationApi,
+                _shareMetadata.ShareId,
+                _fileId,
+                _revisionId,
+                _fileKey,
+                cancellationToken).ConfigureAwait(false);
+
+            using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
             try
             {
@@ -86,7 +91,14 @@ public sealed class RevisionWriter : IDisposable
                     {
                         await WaitForBlockUploaderAsync(uploadTasks, manifestStream, cancellationToken).ConfigureAwait(false);
 
-                        var uploadTask = _client.BlockUploader.UploadAsync(_shareMetadata, _fileId, _revisionId, _contentKey, _signingKey, sample, cancellationToken);
+                        var uploadTask = _client.BlockUploader.UploadAsync(
+                            _shareMetadata,
+                            _fileId,
+                            _revisionId,
+                            _contentKey,
+                            _signingKey,
+                            sample,
+                            cancellationTokenSource.Token);
 
                         uploadTasks.Enqueue(uploadTask);
                     }
@@ -100,12 +112,12 @@ public sealed class RevisionWriter : IDisposable
                             {
                                 var plainDataStream = ProtonDriveClient.MemoryStreamManager.GetStream();
 
-                                await contentInputStream.PartiallyCopyToAsync(plainDataStream, _targetBlockSize, plainDataPrefix, cancellationToken)
+                                await contentInputStream.PartiallyCopyToAsync(plainDataStream, _targetBlockSize, plainDataPrefix, cancellationTokenSource.Token)
                                     .ConfigureAwait(false);
 
                                 blockSizes.Add((int)plainDataStream.Length);
 
-                                await WaitForBlockUploaderAsync(uploadTasks, manifestStream, cancellationToken).ConfigureAwait(false);
+                                await WaitForBlockUploaderAsync(uploadTasks, manifestStream, cancellationTokenSource.Token).ConfigureAwait(false);
 
                                 plainDataStream.Seek(0, SeekOrigin.Begin);
 
@@ -121,13 +133,13 @@ public sealed class RevisionWriter : IDisposable
                                     blockVerifier,
                                     plainDataPrefix,
                                     (int)Math.Min(blockVerifier.DataPacketPrefixMaxLength, plainDataStream.Length),
-                                    (progress) =>
+                                    progress =>
                                     {
                                         numberOfBytesUploaded += progress;
                                         onProgress(numberOfBytesUploaded, contentInputStream.Length);
                                     },
                                     _releaseBlocksAction,
-                                    cancellationToken);
+                                    cancellationTokenSource.Token);
 
                                 uploadTasks.Enqueue(uploadTask);
                             }
@@ -168,7 +180,7 @@ public sealed class RevisionWriter : IDisposable
 
             manifestStream.Seek(0, SeekOrigin.Begin);
 
-            manifestSignature = await _signingKey.SignAsync(manifestStream, cancellationToken).ConfigureAwait(false);
+            manifestSignature = await _signingKey.SignAsync(manifestStream, cancellationTokenSource.Token).ConfigureAwait(false);
         }
 
         var parameters = GetRevisionUpdateParameters(contentInputStream, lastModificationTime, blockSizes, manifestSignature, signinEmailAddress);

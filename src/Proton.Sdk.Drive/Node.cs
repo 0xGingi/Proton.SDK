@@ -157,7 +157,9 @@ public class Node : INode
 
         if (!client.SecretsCache.TryUse(cacheKey, (data, _) => PgpPrivateKey.Import(data), out var key))
         {
+            client.Logger.LogInformation("Cache miss for node key of {NodeId}", nodeIdentity.NodeId.Value);
             await GetAsync(client, nodeIdentity.ShareId, nodeIdentity.NodeId, cancellationToken, operationId).ConfigureAwait(false);
+            client.Logger.LogInformation("Fetched info for {NodeId}", nodeIdentity.NodeId.Value);
 
             if (!client.SecretsCache.TryUse(cacheKey, (data, _) => PgpPrivateKey.Import(data), out key))
             {
@@ -242,6 +244,7 @@ public class Node : INode
         }
 
         secretsCache.Set(GetNodeKeyCacheKey(volumeId, nodeId), key.ToBytes());
+        client.Logger.LogDebug("Unlocked node key for {LinkId} and added it to cache", link.Id);
 
         var hashKeyAndContentKeyVerificationKeyRing =
             await GetNodeAndAddressVerificationKeyRingAsync(client, key, link.SignatureEmailAddress, cancellationToken).ConfigureAwait(false);

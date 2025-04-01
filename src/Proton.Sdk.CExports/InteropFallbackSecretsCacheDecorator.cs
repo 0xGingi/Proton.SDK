@@ -29,7 +29,7 @@ internal class InteropFallbackSecretsCacheDecorator(ISecretsCache decoratedInsta
             var secretAdded = _onSecretRequested.Invoke(cacheKey);
             if (!secretAdded || !_decoratedInstance.TryUse(cacheKey, state, transform, out result))
             {
-                _logger.LogWarning($"Key cache miss for {cacheKey}. It needs to be fetched from the API.");
+                _logger.LogWarning("Key cache miss for {CacheKey}. It needs to be fetched from the API.", cacheKey);
                 return false;
             }
         }

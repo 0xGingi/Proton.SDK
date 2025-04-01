@@ -1,5 +1,8 @@
 using System.Buffers;
+using System.Diagnostics;
+using System.Net;
 using System.Security.Cryptography;
+using Microsoft.IO;
 using Proton.Cryptography.Pgp;
 using Proton.Sdk.Drive.Files;
 using Proton.Sdk.Drive.Verification;
@@ -101,14 +104,7 @@ internal sealed class BlockUploader
                             Thumbnails = [],
                         };
 
-                        var uploadRequestResponse = await _client.FilesApi.RequestBlockUploadAsync(parameters, cancellationToken).ConfigureAwait(false);
-
-                        var uploadTarget = uploadRequestResponse.UploadTargets[0];
-                        var uploadTargetUrl = $"{uploadTarget.BareUrl}/{uploadTarget.Token}";
-
-                        dataPacketStream.Seek(0, SeekOrigin.Begin);
-
-                        await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
+                        await UploadBlobAsync(parameters, dataPacketStream, cancellationToken).ConfigureAwait(false);
 
                         onBlockProgress.Invoke(dataPacketStream.Position);
 
@@ -182,14 +178,7 @@ internal sealed class BlockUploader
                     ],
                 };
 
-                var uploadRequestResponse = await _client.FilesApi.RequestBlockUploadAsync(parameters, cancellationToken).ConfigureAwait(false);
-
-                var uploadTarget = uploadRequestResponse.ThumbnailUploadTargets[0];
-                var uploadTargetUrl = $"{uploadTarget.BareUrl}/{uploadTarget.Token}";
-
-                dataPacketStream.Seek(0, SeekOrigin.Begin);
-
-                await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
+                await UploadBlobAsync(parameters, dataPacketStream, cancellationToken).ConfigureAwait(false);
 
                 return sha256Digest;
             }
@@ -199,5 +188,40 @@ internal sealed class BlockUploader
             BlockSemaphore.Release();
             _client.RevisionCreationSemaphore.Release(1);
         }
+    }
+
+    private async Task UploadBlobAsync(BlockUploadRequestParameters parameters, RecyclableMemoryStream dataPacketStream, CancellationToken cancellationToken)
+    {
+        Debug.Assert(parameters.Thumbnails.Count + parameters.Blocks.Count == 1, "Blob upload request should request only one block (content or thumbnail)");
+
+        var remainingNumberOfAttempts = 2;
+
+        while (remainingNumberOfAttempts > 0)
+        {
+            try
+            {
+                var uploadRequestResponse = await _client.FilesApi.RequestBlockUploadAsync(parameters, cancellationToken).ConfigureAwait(false);
+
+                var uploadTarget = parameters.Thumbnails.Count == 0 ? uploadRequestResponse.UploadTargets[0] : uploadRequestResponse.ThumbnailUploadTargets[0];
+                var uploadTargetUrl = $"{uploadTarget.BareUrl}/{uploadTarget.Token}";
+
+                dataPacketStream.Seek(0, SeekOrigin.Begin);
+
+                await _client.StorageApi.UploadBlobAsync(uploadTargetUrl, dataPacketStream, cancellationToken).ConfigureAwait(false);
+
+                remainingNumberOfAttempts = 0;
+            }
+            catch (Exception e) when (UrlExpired(e) || BlobAlreadyUploaded(e))
+            {
+                --remainingNumberOfAttempts;
+            }
+        }
+
+        return;
+
+        static bool UrlExpired(Exception e) => e is HttpRequestException { StatusCode: HttpStatusCode.NotFound };
+
+        // This can happen if the previous successful upload response was not processed (e.g. connection interrupted just as the success was being sent back)
+        static bool BlobAlreadyUploaded(Exception e) => e is ProtonApiException { Code: ResponseCode.AlreadyExists };
     }
 }

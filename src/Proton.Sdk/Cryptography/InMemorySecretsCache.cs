@@ -1,12 +1,14 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Proton.Sdk.Cryptography;
 
-public sealed class InMemorySecretsCache : ISecretsCache
+public sealed class InMemorySecretsCache(ILogger<InMemorySecretsCache>? logger = null) : ISecretsCache
 {
     private readonly MemoryCache _memoryCache = new(new MemoryCacheOptions());
+    private readonly ILogger<InMemorySecretsCache> _logger = logger ?? new NullLogger<InMemorySecretsCache>();
 
     public void Set(CacheKey cacheKey, ReadOnlySpan<byte> secretBytes, byte flags, TimeSpan expiration)
     {
@@ -20,6 +22,7 @@ public sealed class InMemorySecretsCache : ISecretsCache
             }
 
             entry.Value = new Secret(secretBytes.ToArray(), flags);
+            _logger.LogDebug("Set {ValueLength}-byte value for key {CacheKey}", secretBytes.Length, cacheKey);
         }
     }
 
@@ -46,9 +49,13 @@ public sealed class InMemorySecretsCache : ISecretsCache
         {
             if (!_memoryCache.TryGetValue(cacheKey, out secret) || secret is null)
             {
+                _logger.LogDebug("Key {CacheKey} not found", cacheKey);
+
                 result = default;
                 return false;
             }
+
+            _logger.LogDebug("Found {ValueLength}-byte value for {CacheKey}", secret.Bytes.Length, cacheKey);
         }
 
         result = transform.Invoke(state, secret.Bytes, secret.Flags);
@@ -67,13 +74,13 @@ public sealed class InMemorySecretsCache : ISecretsCache
         {
             if (!_memoryCache.TryGetValue<CacheKey[]>(groupCacheKey, out var cacheKeys) || cacheKeys is null)
             {
-                Debug.WriteLine($"Cache: Group key {groupCacheKey} not found");
+                _logger.LogDebug("Group key {GroupCacheKey} not found", groupCacheKey);
 
                 result = null;
                 return false;
             }
 
-            Debug.WriteLine($"Cache: Found {cacheKeys.Length} cache keys for {groupCacheKey}");
+            _logger.LogDebug("Found {Count} cache keys for {GroupCacheKey}", cacheKeys.Length, groupCacheKey);
 
             result = TransformEntries(cacheKeys, state, transform).ToList();
 
@@ -86,6 +93,7 @@ public sealed class InMemorySecretsCache : ISecretsCache
         lock (_memoryCache)
         {
             _memoryCache.Remove(cacheKey);
+            _logger.LogDebug("Removed entry for key {CacheKey}", cacheKey);
         }
     }
 
