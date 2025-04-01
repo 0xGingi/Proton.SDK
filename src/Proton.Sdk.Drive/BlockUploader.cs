@@ -196,7 +196,7 @@ internal sealed class BlockUploader
 
         var remainingNumberOfAttempts = 2;
 
-        while (remainingNumberOfAttempts > 0)
+        while (remainingNumberOfAttempts >= 1)
         {
             try
             {
@@ -211,7 +211,7 @@ internal sealed class BlockUploader
 
                 remainingNumberOfAttempts = 0;
             }
-            catch (Exception e) when (UrlExpired(e) || BlobAlreadyUploaded(e))
+            catch (Exception e) when ((UrlExpired(e) || BlobAlreadyUploaded(e)) && remainingNumberOfAttempts >= 2)
             {
                 --remainingNumberOfAttempts;
             }
@@ -221,7 +221,11 @@ internal sealed class BlockUploader
 
         static bool UrlExpired(Exception e) => e is HttpRequestException { StatusCode: HttpStatusCode.NotFound };
 
-        // This can happen if the previous successful upload response was not processed (e.g. connection interrupted just as the success was being sent back)
+        // This can happen if the previous successful upload response was not received/processed,
+        // which could happen for instance if the connection was interrupted just as the success was being sent back.
+        // The HTTP client's resilience logic will kick in and retry the blob upload at the same URL
+        // without handing control back to register a new block at the same index with its own new URL,
+        // causing the back-end to reject the upload with this error.
         static bool BlobAlreadyUploaded(Exception e) => e is ProtonApiException { Code: ResponseCode.AlreadyExists };
     }
 }
