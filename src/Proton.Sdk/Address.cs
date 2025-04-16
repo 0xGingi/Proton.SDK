@@ -201,7 +201,7 @@ public sealed class Address(AddressId id, int order, string emailAddress, Addres
 
                 publicKeyCacheKeys = publicKeyCacheKeys[..publicKeys.Count];
             }
-            catch (ProtonApiException e) when (e.Code is ResponseCode.UnknownAddress)
+            catch (ProtonApiException e) when (e.Code is ResponseCode.UnknownAddress or ResponseCode.UnknownExternalAddress)
             {
                 client.Logger.LogError(e, "Unknown address {EmailAddress}", emailAddress);
 

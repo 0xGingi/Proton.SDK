@@ -42,6 +42,7 @@ public enum ResponseCode
     NoActiveSubscription = 22110,
 
     UnknownAddress = 33102,
+    UnknownExternalAddress = 33103,
 
     ProtonDriveUnknown = 200000,
     InsufficientQuota = ProtonDriveUnknown + 1,

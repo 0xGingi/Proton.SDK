@@ -385,7 +385,11 @@ public class Node : INode
 
             if (verificationResult.Status is not PgpVerificationStatus.Ok)
             {
-                client.Logger.LogWarning("Signature verification failed for name (volume ID: {VolumeId}, file ID: {NodeId})", volumeId, nodeId);
+                client.Logger.LogWarning(
+                    "Signature verification failed for name (volume ID: {VolumeId}, file ID: {NodeId}, status: {Status})",
+                    volumeId,
+                    nodeId,
+                    verificationResult.Status);
             }
 
             return name;
