@@ -1,11 +1,11 @@
-# Proton Drive SDK Demonstration for .NET
+# Proton Drive SDK Technical Demonstration for .NET
 
 ## Introduction
 
-This repository contains a technical preview of code organized as an SDK for .NET, as well as C-compatible exports for bindings to other languages (but only for upload and download).
+This repository contains a technical demonstration written in C# of code organized as an SDK for .NET, as well as C-compatible exports for bindings to other languages (but only for upload and download).
 There will be no public support nor documentation for this code, it is only published for demonstration purposes and its use by 3rd party applications is strongly discouraged.
 
-This preview uses Protobufs for simplification of bindings to other languages, and contains several idiosyncracies and shortcuts that were tailored for internal use.
+This tech demo uses Protobufs for simplification of bindings to other languages, and contains several idiosyncracies and shortcuts that were tailored for internal use.
 Any proper SDK will differ significantly from the code in this repository, contain a comprehensive test suite, documentation, and will cover more features.
 
 
