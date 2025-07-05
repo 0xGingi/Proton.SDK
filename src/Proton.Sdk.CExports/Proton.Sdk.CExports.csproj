@@ -3,19 +3,11 @@
   <PropertyGroup>
     <AssemblyName>$(NativeLibPrefix)proton_sdk</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <TrimmerSingleWarn>false</TrimmerSingleWarn>
     <PublishAot>true</PublishAot>
-
-    <OutputType>Library</OutputType>
-    <EnableDynamicLoading>true</EnableDynamicLoading>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(PublishAot)' == 'true'">
-    <NoWarn>$(NoWarn);IL3050;IL2026;IL2070;IL2075</NoWarn>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\crypto\src\dotnet\Proton.Cryptography.csproj" />
     <ProjectReference Include="..\Proton.Sdk\Proton.Sdk.csproj" />
   </ItemGroup>
 
@@ -27,15 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Google.Protobuf" Version="3.31.1" />
-    <PackageReference Update="Roslynator.Analyzers" Version="4.13.1">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Update="StyleCop.Analyzers" Version="1.2.0-beta.556">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="Proton.Cryptography"/>
+    <PackageReference Include="Google.Protobuf" />
   </ItemGroup>
 
 </Project>
