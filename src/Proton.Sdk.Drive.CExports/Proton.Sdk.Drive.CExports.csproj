@@ -16,6 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\crypto\src\dotnet\Proton.Cryptography.csproj" />
     <ProjectReference Include="..\Proton.Cryptography\Proton.Cryptography.csproj" />
     <ProjectReference Include="..\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Drive\Proton.Sdk.Drive.csproj" />

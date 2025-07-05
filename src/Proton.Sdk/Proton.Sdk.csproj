@@ -43,6 +43,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\crypto\src\dotnet\Proton.Cryptography.csproj" />
     <ProjectReference Include="..\Proton.Cryptography\Proton.Cryptography.csproj" />
   </ItemGroup>
 
