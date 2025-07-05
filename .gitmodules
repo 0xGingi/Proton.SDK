@@ -1,3 +1,0 @@
-[submodule "src/crypto"]
-	path = src/crypto
-	url = git@github.com:ProtonDriveApps/dotnet-crypto.git
