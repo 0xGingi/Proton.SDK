@@ -5,7 +5,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
     <!-- It is necessary to specify a runtime identifier that will be overriden for dependencies, otherwise the property will be empty for dependencies -->
-    <RuntimeIdentifier Condition="'$(Configuration)' == 'Release'">linux-x64</RuntimeIdentifier>
+    <RuntimeIdentifiers Condition="'$(Configuration)' == 'Release'">win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
 
     <Product>Proton Drive</Product>
     <Authors>Proton AG</Authors>
@@ -18,7 +18,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <NeutralLanguage>en</NeutralLanguage>
     <Deterministic>true</Deterministic>
-<!--    <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>-->
+    <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
 
     <NativeLibPrefix Condition="$(RuntimeIdentifier.StartsWith('linux')) or $(RuntimeIdentifier.StartsWith('android'))">lib</NativeLibPrefix>
   </PropertyGroup>

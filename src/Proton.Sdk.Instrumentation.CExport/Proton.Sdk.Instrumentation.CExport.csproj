@@ -13,7 +13,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj" />
+    <ProjectReference Include="..\Proton.Sdk.Drive\Proton.Sdk.Drive.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Instrumentation\Proton.Sdk.Instrumentation.csproj" />
+    <ProjectReference Include="..\Proton.Sdk\Proton.Sdk.csproj" />
   </ItemGroup>
 
   <ItemGroup>

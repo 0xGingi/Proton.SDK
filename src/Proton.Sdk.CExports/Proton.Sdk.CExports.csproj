@@ -21,6 +21,7 @@
   <ItemGroup>
     <PackageReference Include="Proton.Cryptography"/>
     <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
 </Project>

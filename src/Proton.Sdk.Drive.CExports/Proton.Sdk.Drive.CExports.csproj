@@ -12,6 +12,7 @@
     <ProjectReference Include="..\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Drive\Proton.Sdk.Drive.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Instrumentation.CExport\Proton.Sdk.Instrumentation.CExport.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
   <ItemGroup>

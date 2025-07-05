@@ -14,8 +14,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Configuration", "Configurat
 		.editorconfig = .editorconfig
 		.globalconfig = .globalconfig
 		Directory.Build.props = Directory.Build.props
-		Directory.Packages.props = Directory.Packages.props
 		README.md = README.md
+		src\Directory.Packages.props = src\Directory.Packages.props
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proton.Sdk.CExports", "src\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj", "{2DA5BC80-EA66-4B2F-BD98-87EAC587E733}"
@@ -31,8 +31,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{92DB46
 		protos\account.proto = protos\account.proto
 		protos\drive.proto = protos\drive.proto
 	EndProjectSection
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Proton.Cryptography", "src\crypto\src\dotnet\Proton.Cryptography.csproj", "{E807FB22-674E-47A6-8146-F547AB381009}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -64,10 +62,6 @@ Global
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E807FB22-674E-47A6-8146-F547AB381009}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E807FB22-674E-47A6-8146-F547AB381009}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E807FB22-674E-47A6-8146-F547AB381009}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E807FB22-674E-47A6-8146-F547AB381009}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -80,7 +74,6 @@ Global
 		{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 		{4E5500E6-778E-44F4-AE67-B881D4197346} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 		{92DB46A4-575F-424F-800F-F4B22674FC78} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
-		{E807FB22-674E-47A6-8146-F547AB381009} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4B5CF797-DDDC-4513-A10C-BE0AE9FD1B8E}

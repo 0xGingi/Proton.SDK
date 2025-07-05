@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj" />
     <ProjectReference Include="..\Proton.Sdk\Proton.Sdk.csproj" />
   </ItemGroup>
 
@@ -10,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="Proton.Cryptography" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
 </Project>

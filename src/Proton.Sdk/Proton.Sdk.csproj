@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Proton.Cryptography"/>
+    <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="System.Net.Http.Json" />
     <PackageReference Include="Google.Protobuf" />
     <PackageReference Include="Grpc.Tools">

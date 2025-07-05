@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" />
     <PackageReference Include="Proton.Cryptography" PrivateAssets="compile"/>
+    <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Grpc.Tools">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
