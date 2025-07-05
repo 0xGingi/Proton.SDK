@@ -19,8 +19,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Proton.Cryptography" />
-    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Google.Protobuf" Version="3.31.1" />
+    <PackageReference Update="Roslynator.Analyzers" Version="4.13.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Update="StyleCop.Analyzers" Version="1.2.0-beta.556">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>

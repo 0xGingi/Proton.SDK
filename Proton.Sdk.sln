@@ -32,6 +32,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{92DB46
 		protos\drive.proto = protos\drive.proto
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Proton.Cryptography", "src\Proton.Cryptography\Proton.Cryptography.csproj", "{52781DD2-DE8B-42EE-AF77-1BDAD130CC0C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,6 +64,10 @@ Global
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52781DD2-DE8B-42EE-AF77-1BDAD130CC0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52781DD2-DE8B-42EE-AF77-1BDAD130CC0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52781DD2-DE8B-42EE-AF77-1BDAD130CC0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52781DD2-DE8B-42EE-AF77-1BDAD130CC0C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -74,6 +80,7 @@ Global
 		{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 		{4E5500E6-778E-44F4-AE67-B881D4197346} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 		{92DB46A4-575F-424F-800F-F4B22674FC78} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+		{52781DD2-DE8B-42EE-AF77-1BDAD130CC0C} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4B5CF797-DDDC-4513-A10C-BE0AE9FD1B8E}

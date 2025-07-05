@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Proton.Cryptography\Proton.Cryptography.csproj" />
     <ProjectReference Include="..\Proton.Sdk.CExports\Proton.Sdk.CExports.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Drive\Proton.Sdk.Drive.csproj" />
     <ProjectReference Include="..\Proton.Sdk.Instrumentation.CExport\Proton.Sdk.Instrumentation.CExport.csproj" />
@@ -22,7 +23,8 @@
   <!-- Static-link the crypto library unless targeting Android -->
   <ItemGroup Condition="!$(RuntimeIdentifier.StartsWith('linux-bionic'))">
     <!-- While the project does not use the package directly, the path to the package is needed to refer to the static link library -->
-    <PackageReference Include="Proton.Cryptography" GeneratePathProperty="true" />
+<!--    <PackageReference Include="Proton.Cryptography" GeneratePathProperty="true" />-->
+    
 
     <DirectPInvoke Include="$(NativeCryptoLibName)" />
     <NativeLibrary Include="$(PkgProton_Cryptography)\runtimes\$(RuntimeIdentifier)\native\$(NativeLibPrefix)$(NativeCryptoLibName)$(LibFileExt)" />
@@ -31,6 +33,16 @@
   <!-- If targeting Android, add the required SONAME to the output library -->
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux-bionic'))">
     <LinkerArg Include="-Wl,-soname,$(TargetName)$(NativeBinaryExt)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Update="Roslynator.Analyzers" Version="4.13.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Update="StyleCop.Analyzers" Version="1.2.0-beta.556">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>
