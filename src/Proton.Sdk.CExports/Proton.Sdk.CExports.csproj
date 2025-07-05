@@ -4,7 +4,14 @@
     <AssemblyName>$(NativeLibPrefix)proton_sdk</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <PublishAot>true</PublishAot>
+
+    <OutputType>Library</OutputType>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+    <NoWarn>$(NoWarn);IL3050;IL2026;IL2070;IL2075</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
