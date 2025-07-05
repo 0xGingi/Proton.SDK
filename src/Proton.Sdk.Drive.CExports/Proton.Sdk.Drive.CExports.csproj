@@ -3,9 +3,9 @@
   <PropertyGroup>
     <AssemblyName>$(NativeLibPrefix)proton_drive_sdk</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PublishAot>true</PublishAot>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
     <NativeCryptoLibName>proton_crypto</NativeCryptoLibName>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
   <ItemGroup>

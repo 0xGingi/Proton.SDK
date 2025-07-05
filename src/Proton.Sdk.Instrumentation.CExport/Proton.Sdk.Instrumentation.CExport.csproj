@@ -3,8 +3,8 @@
   <PropertyGroup>
     <AssemblyName>$(NativeLibPrefix)proton_instrumentation_sdk</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PublishAot>true</PublishAot>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
 
   <ItemGroup>
