@@ -20,18 +20,36 @@
     <IlcCompileInput Include="$(OutputPath)\$(NativeLibPrefix)proton_instrumentation_sdk.dll" />
   </ItemGroup>
 
-  <!-- Static-link the crypto library unless targeting Android -->
-  <ItemGroup Condition="!$(RuntimeIdentifier.StartsWith('linux-bionic'))">
+  <!-- Static-link the crypto library for non-Windows and non-Android platforms -->
+  <ItemGroup Condition="!$(RuntimeIdentifier.StartsWith('linux-bionic')) AND !$(RuntimeIdentifier.StartsWith('win'))">
     <!-- While the project does not use the package directly, the path to the package is needed to refer to the static link library -->
     <PackageReference Include="Proton.Cryptography" GeneratePathProperty="true"/>
 
     <DirectPInvoke Include="$(NativeCryptoLibName)" />
+    
+    <!-- Non-Windows static linking: Use original extension -->
     <NativeLibrary Include="$(PkgProton_Cryptography)\runtimes\$(RuntimeIdentifier)\native\$(NativeLibPrefix)$(NativeCryptoLibName)$(LibFileExt)" />
+  </ItemGroup>
+
+  <!-- Windows: Use dynamic linking to avoid MSVC compatibility issues -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
+    <PackageReference Include="Proton.Cryptography" GeneratePathProperty="true"/>
+    
+    <!-- Copy the DLL to output directory for runtime loading -->
+    <None Include="$(PkgProton_Cryptography)\runtimes\$(RuntimeIdentifier)\native\$(NativeCryptoLibName).dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>$(NativeCryptoLibName).dll</Link>
+    </None>
   </ItemGroup>
 
   <!-- If targeting Android, add the required SONAME to the output library -->
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux-bionic'))">
     <LinkerArg Include="-Wl,-soname,$(TargetName)$(NativeBinaryExt)" />
+  </ItemGroup>
+
+  <!-- Windows-specific linker arguments (simplified since we're not static linking crypto) -->
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
+    <!-- Remove problematic linker args since we're using dynamic linking -->
   </ItemGroup>
 
 </Project>
