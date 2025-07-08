@@ -35,6 +35,11 @@ typedef struct {
     bool (*callback)(const void*, ByteArray); // KeyCacheMissMessage
 } BooleanCallback;
 
+typedef struct {
+    const void* state;
+    bool (*callback)(const void* state, ByteArray context, ByteArray* out_code); // KeyCacheMissMessage, StringResponse
+} TwoFactorRequestedCallback;
+
 // Cancellation
 
 intptr_t cancellation_token_source_create();
@@ -50,10 +55,11 @@ void cancellation_token_source_free(
 // Sessions
 
 int session_begin(
-    intptr_t unused_handle, // Added for the sake of uniformity
+    intptr_t unused_handle,
     ByteArray pointer, // SessionBeginRequest
     Callback request_response_body_callback,
     BooleanCallback secret_requested_callback,
+    TwoFactorRequestedCallback two_factor_requested_callback,
     Callback tokens_refreshed_callback,
     AsyncCallback callback
 );

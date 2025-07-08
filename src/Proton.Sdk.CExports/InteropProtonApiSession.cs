@@ -28,12 +28,20 @@ internal static class InteropProtonApiSession
         return session is not null;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal unsafe struct InteropTwoFactorRequestedCallback
+    {
+        public nint State;
+        public delegate* unmanaged[Cdecl]<nint, InteropArray, out InteropArray, bool> Callback;
+    }
+
     [UnmanagedCallersOnly(EntryPoint = "session_begin", CallConvs = [typeof(CallConvCdecl)])]
     private static unsafe int NativeBegin(
         nint unused,
         InteropArray sessionBeginRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
         InteropSecretRequestedCallback secretRequestedCallback,
+        InteropTwoFactorRequestedCallback twoFactorRequestedCallback,
         InteropTokensRefreshedCallback tokensRefreshedCallback,
         InteropAsyncCallback callback)
     {
@@ -43,7 +51,6 @@ internal static class InteropProtonApiSession
                 ? new Func<KeyCacheMissMessage, bool>(keyCacheMissMessage =>
                 {
                     var messageBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
-
                     try
                     {
                         return secretRequestedCallback.OnSecretRequested(secretRequestedCallback.State, messageBytes);
@@ -55,8 +62,26 @@ internal static class InteropProtonApiSession
                 })
                 : null;
 
+            var onTwoFactorRequested = twoFactorRequestedCallback.Callback != null && twoFactorRequestedCallback.State != nint.Zero
+                ? new Func<KeyCacheMissMessage, string?>(keyCacheMissMessage =>
+                {
+                    var contextBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
+                    InteropArray outCode;
+                    var result = twoFactorRequestedCallback.Callback(twoFactorRequestedCallback.State, contextBytes, out outCode);
+                    contextBytes.Free();
+                    if (result)
+                    {
+                        var stringResponse = StringResponse.Parser.ParseFrom(outCode.AsReadOnlySpan());
+                        outCode.Free();
+                        return stringResponse.Value;
+                    }
+
+                    return null;
+                })
+                : null;
+
             return callback.InvokeFor(
-                ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, onSecretRequested, tokensRefreshedCallback, ct));
+                ct => InteropBeginAsync(sessionBeginRequestBytes, requestResponseBodyCallback, onSecretRequested, onTwoFactorRequested, tokensRefreshedCallback, ct));
         }
         catch
         {
@@ -260,6 +285,7 @@ internal static class InteropProtonApiSession
         InteropArray sessionBeginRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
         Func<KeyCacheMissMessage, bool>? onSecretRequested,
+        Func<KeyCacheMissMessage, string?>? onTwoFactorRequested,
         InteropTokensRefreshedCallback tokensRefreshedCallback,
         CancellationToken cancellationToken)
     {
@@ -288,6 +314,22 @@ internal static class InteropProtonApiSession
             var session = await ProtonApiSession.BeginAsync(
                 sessionBeginRequest,
                 cancellationToken).ConfigureAwait(false);
+
+            // 2FA callback logic
+            if (session.IsWaitingForSecondFactorCode && onTwoFactorRequested != null)
+            {
+                var twoFactorRequest = new KeyCacheMissMessage
+                {
+                    HolderId = session.UserId.Value,
+                    HolderName = session.Username,
+                    ValueName = "two_factor_code"
+                };
+                var code = onTwoFactorRequested(twoFactorRequest);
+                if (!string.IsNullOrEmpty(code))
+                {
+                    await session.ApplySecondFactorCodeAsync(code, cancellationToken).ConfigureAwait(false);
+                }
+            }
 
             session.TokenCredential.TokensRefreshed += (accessToken, refreshToken) =>
                 tokensRefreshedCallback.TokensRefreshed(accessToken, refreshToken);

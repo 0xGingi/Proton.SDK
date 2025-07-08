@@ -34,6 +34,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{92DB46
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Proton.Sdk.Testing", "Proton.Sdk.Testing\Proton.Sdk.Testing.csproj", "{29ECAA67-076C-4C37-852B-B74CB8BE9A04}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Header", "Header", "{E27C21FA-6FA7-46B6-B771-D67A9F8A36AB}"
+	ProjectSection(SolutionItems) = preProject
+		headers\proton_sdk.h = headers\proton_sdk.h
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -80,6 +85,7 @@ Global
 		{73F38BFC-86A2-44A7-B1D2-CA9E4BF2E6C9} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 		{4E5500E6-778E-44F4-AE67-B881D4197346} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 		{92DB46A4-575F-424F-800F-F4B22674FC78} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
+		{E27C21FA-6FA7-46B6-B771-D67A9F8A36AB} = {81787E6F-A6FD-48F6-BB23-D2A315256815}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4B5CF797-DDDC-4513-A10C-BE0AE9FD1B8E}
