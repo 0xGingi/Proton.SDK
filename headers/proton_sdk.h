@@ -124,6 +124,12 @@ ByteArray drive_client_get_volumes(
     intptr_t cancellation_token_source_handle
 );
 
+ByteArray drive_client_get_shares(
+    intptr_t client_handle,
+    ByteArray volume_metadata,
+    intptr_t cancellation_token
+);
+
 void drive_client_free(intptr_t client_handle);
 
 // Observability service

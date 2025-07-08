@@ -33,6 +33,8 @@ public class Program
         }
 
         Console.WriteLine($"Found {volumes.Length} volume(s).");
+        Console.WriteLine($"Volume size: {volumes[0].MaxSpace}");
+        Console.WriteLine("Volume ID: " + volumes[0].Id);
         var mainVolume = volumes[0];
         var share = await client.GetShareAsync(mainVolume.RootShareId, cancellationToken);
         await CheckFolderChildrenRecursiveAsync(client, share, mainVolume, cancellationToken);
@@ -54,7 +56,7 @@ public class Program
             var childPath = string.IsNullOrEmpty(currentPath) ? child.Name : $"{currentPath}/{child.Name}";
             if (child is FolderNode folder)
             {
-                await CheckFolderChildrenRecursiveAsync(client, share, volume, folder, token, childPath);
+                await CheckFolderChildrenRecursiveAsync(client, share, folder, token, childPath);
             }
             else
             {
@@ -66,7 +68,6 @@ public class Program
     private static async Task CheckFolderChildrenRecursiveAsync(
         ProtonDriveClient client,
         Share share,
-        Volume volume,
         FolderNode node,
         CancellationToken token,
         string currentPath)
@@ -74,13 +75,15 @@ public class Program
         var children = client.GetFolderChildrenAsync(
             new NodeIdentity(share.ShareId, node.NodeIdentity.VolumeId, node.NodeIdentity.NodeId),
             token);
+        Console.WriteLine("Node Identity Volume ID: " + node.NodeIdentity.VolumeId);
+        Console.WriteLine("Node Identity Node ID: " + node.NodeIdentity.NodeId);
 
         await foreach (var child in children)
         {
             var childPath = string.IsNullOrEmpty(currentPath) ? child.Name : $"{currentPath}/{child.Name}";
             if (child is FolderNode folder)
             {
-                await CheckFolderChildrenRecursiveAsync(client, share, volume, folder, token, childPath);
+                await CheckFolderChildrenRecursiveAsync(client, share, folder, token, childPath);
             }
             else
             {

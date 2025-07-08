@@ -172,4 +172,44 @@ internal static class InteropProtonDriveClient
             return InteropArray.FromMemory(Array.Empty<byte>());
         }
     }
+
+    [UnmanagedCallersOnly(EntryPoint = "drive_client_get_shares", CallConvs = [typeof(CallConvCdecl)])]
+    public static InteropArray NativeGetShare(nint clientHandle, InteropArray volumes, nint cancellationTokenSourceHandle) // Returns Share in drive.proto
+    {
+        // var share = await client.GetShareAsync(mainVolume.RootShareId, cancellationToken);
+        try
+        {
+            if (!TryGetFromHandle(clientHandle, out var client))
+            {
+                return InteropArray.FromMemory(Array.Empty<byte>());
+            }
+
+            var cancellationToken =
+                InteropCancellationTokenSource.TryGetTokenFromHandle(cancellationTokenSourceHandle, out var token);
+            if (!cancellationToken)
+            {
+                return InteropArray.FromMemory(Array.Empty<byte>());
+            }
+
+            VolumeMetadata volumeMetadata = VolumeMetadata.Parser.ParseFrom(volumes.AsReadOnlySpan());
+            var share = client.GetShareAsync(volumeMetadata.RootShareId, token).GetAwaiter().GetResult();
+
+            var response = new Share
+            {
+                ShareId = share.ShareId,
+                MembershipAddressId = share.MembershipAddressId,
+                MembershipEmailAddress = share.MembershipEmailAddress,
+                VolumeId = volumeMetadata.VolumeId,
+                RootNodeId = share.RootNodeId // this changes for each folder...
+            };
+            var bytes = response.ToByteArray();
+            Console.WriteLine("Returning successful response");
+            return InteropArray.FromMemory(bytes);
+        }
+        catch
+        {
+            Console.WriteLine("Error in NativeGetShare, returning empty array");
+            return InteropArray.FromMemory(Array.Empty<byte>());
+        }
+    }
 }
