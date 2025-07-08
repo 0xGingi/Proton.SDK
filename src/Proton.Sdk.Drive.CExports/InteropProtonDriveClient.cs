@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Google.Protobuf;
 using Proton.Sdk.CExports;
 using Proton.Sdk.Cryptography;
 using Proton.Sdk.Instrumentation.CExport;
@@ -139,6 +140,36 @@ internal static class InteropProtonDriveClient
         catch
         {
             // Ignore
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "drive_client_get_volumes", CallConvs = [typeof(CallConvCdecl)])]
+    public static InteropArray NativeGetVolumes(nint clientHandle, nint cancellationTokenSourceHandle)
+    {
+        try
+        {
+            if (!TryGetFromHandle(clientHandle, out var client))
+                return InteropArray.FromMemory(Array.Empty<byte>());
+
+            InteropCancellationTokenSource.TryGetTokenFromHandle(cancellationTokenSourceHandle, out var token);
+
+            var volumes = client.GetVolumesAsync(token).GetAwaiter().GetResult();
+
+            var response = new VolumesResponse();
+            response.Volumes.AddRange(volumes.Select(v => new VolumeMetadata
+            {
+                VolumeId = new VolumeId { Value = v.Id.Value },
+                State = v.State,
+                MaxSpace = v.MaxSpace ?? 0,
+                RootShareId = v.RootShareId
+            }));
+
+            var bytes = response.ToByteArray();
+            return InteropArray.FromMemory(bytes);
+        }
+        catch
+        {
+            return InteropArray.FromMemory(Array.Empty<byte>());
         }
     }
 }

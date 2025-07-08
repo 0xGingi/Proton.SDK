@@ -32,6 +32,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{92DB46
 		protos\drive.proto = protos\drive.proto
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Proton.Sdk.Testing", "Proton.Sdk.Testing\Proton.Sdk.Testing.csproj", "{29ECAA67-076C-4C37-852B-B74CB8BE9A04}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,6 +64,10 @@ Global
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E5500E6-778E-44F4-AE67-B881D4197346}.Release|Any CPU.Build.0 = Release|Any CPU
+		{29ECAA67-076C-4C37-852B-B74CB8BE9A04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{29ECAA67-076C-4C37-852B-B74CB8BE9A04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{29ECAA67-076C-4C37-852B-B74CB8BE9A04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{29ECAA67-076C-4C37-852B-B74CB8BE9A04}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

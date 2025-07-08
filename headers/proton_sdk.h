@@ -119,6 +119,11 @@ int drive_client_register_share_key(
     ByteArray pointer // ShareKeyRegistrationRequest
 );
 
+ByteArray drive_client_get_volumes(
+    intptr_t client_handle,
+    intptr_t cancellation_token_source_handle
+);
+
 void drive_client_free(intptr_t client_handle);
 
 // Observability service
