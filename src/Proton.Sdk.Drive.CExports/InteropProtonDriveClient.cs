@@ -212,4 +212,63 @@ internal static class InteropProtonDriveClient
             return InteropArray.FromMemory(Array.Empty<byte>());
         }
     }
+
+    [UnmanagedCallersOnly(EntryPoint = "drive_client_get_folder_children", CallConvs = [typeof(CallConvCdecl)])]
+    public static InteropArray NativeGetFolderChildren(nint clientHandle, InteropArray nodeIdentityBytes, nint cancellationTokenSourceHandle)
+    {
+        try
+        {
+            if (!TryGetFromHandle(clientHandle, out var client))
+                return InteropArray.FromMemory(Array.Empty<byte>());
+
+            if (!InteropCancellationTokenSource.TryGetTokenFromHandle(cancellationTokenSourceHandle, out var token))
+                return InteropArray.FromMemory(Array.Empty<byte>());
+
+            var nodeIdentity = NodeIdentity.Parser.ParseFrom(nodeIdentityBytes.AsReadOnlySpan());
+
+            var nodes = client.GetFolderChildrenAsync(nodeIdentity, token)
+                .ToBlockingEnumerable()
+                .Select(n =>
+                {
+                    var node = new NodeType();
+                    switch (n)
+                    {
+                        case FileNode file:
+                            node.FileNode = new FileNode
+                            {
+                                NodeIdentity = file.NodeIdentity,
+                                ParentId = file.ParentId,
+                                Name = file.Name,
+                                NameHashDigest = file.NameHashDigest,
+                                State = file.State,
+                                ActiveRevision = file.ActiveRevision
+                            };
+                            break;
+                        case FolderNode folder:
+                            node.FolderNode = new FolderNode
+                            {
+                                NodeIdentity = folder.NodeIdentity,
+                                ParentId = folder.ParentId,
+                                Name = folder.Name,
+                                NameHashDigest = folder.NameHashDigest,
+                                State = folder.State
+                            };
+                            break;
+                    }
+
+                    return node;
+                })
+                .ToList();
+
+            var nodeTypeList = new NodeTypeList();
+            nodeTypeList.Nodes.AddRange(nodes);
+
+            var bytes = nodeTypeList.ToByteArray();
+            return InteropArray.FromMemory(bytes);
+        }
+        catch
+        {
+            return InteropArray.FromMemory(Array.Empty<byte>());
+        }
+    }
 }

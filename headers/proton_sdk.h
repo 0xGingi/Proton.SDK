@@ -130,6 +130,13 @@ ByteArray drive_client_get_shares(
     intptr_t cancellation_token
 );
 
+// NodeType
+ByteArray drive_client_get_folder_children(
+    intptr_t client_handle,
+    ByteArray node_identity, // NodeIdentity
+    intptr_t cancellation_token_source_handle
+);
+
 void drive_client_free(intptr_t client_handle);
 
 // Observability service
