@@ -50,6 +50,7 @@ internal static class InteropProtonApiSession
             var onSecretRequested = secretRequestedCallback.OnSecretRequested != null && secretRequestedCallback.State != null
                 ? new Func<KeyCacheMissMessage, bool>(keyCacheMissMessage =>
                 {
+                    Console.WriteLine("Secret requested ping");
                     var messageBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
                     try
                     {
@@ -65,6 +66,7 @@ internal static class InteropProtonApiSession
             var onTwoFactorRequested = twoFactorRequestedCallback.Callback != null && twoFactorRequestedCallback.State != nint.Zero
                 ? new Func<KeyCacheMissMessage, string?>(keyCacheMissMessage =>
                 {
+                    Console.WriteLine("Two factor callback ping");
                     var contextBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
                     InteropArray outCode;
                     var result = twoFactorRequestedCallback.Callback(twoFactorRequestedCallback.State, contextBytes, out outCode);
