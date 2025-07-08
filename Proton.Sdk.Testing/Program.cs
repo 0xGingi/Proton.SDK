@@ -9,20 +9,32 @@ public class Program
         Console.WriteLine("Proton Drive Client Test");
         var sessionBeginRequest = new SessionBeginRequest
         {
-            Username = "aPriestImamAndRabbiWalkIntoABar",
-            Password = "The bartender asks, `What is this, a joke?`",
+            Username = "user@protonmail.com",
+            Password = "password",
             Options = new() { AppVersion = "macos-drive@1.0.0-alpha.1+rclone" },
         };
         Console.WriteLine("Starting session with username: " + sessionBeginRequest.Username);
+        var cancellationToken = CancellationToken.None;
 
-        var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, CancellationToken.None);
+        var session = await ProtonApiSession.BeginAsync(sessionBeginRequest, cancellationToken);
         if (session is null)
         {
             Console.WriteLine("Failed to start session.");
             return;
         }
 
-        var cancellationToken = CancellationToken.None;
+        if (session.IsWaitingForSecondFactorCode)
+        {
+            Console.WriteLine("Input your two factor code: ");
+            string two_factor = Console.ReadLine();
+            if (two_factor is null)
+            {
+                two_factor = string.Empty;
+            }
+
+            await session.ApplySecondFactorCodeAsync(two_factor, cancellationToken);
+        }
+
         var client = new ProtonDriveClient(session);
         Console.WriteLine("Creating new ProtonDriveClient instance.");
         var volumes = await client.GetVolumesAsync(cancellationToken);
