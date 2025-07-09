@@ -1,4 +1,6 @@
-﻿using Proton.Sdk.Drive;
+﻿using System.Text;
+using Proton.Sdk.Drive;
+using DotNetEnv;
 
 namespace Proton.Sdk.Testing;
 
@@ -6,11 +8,44 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
+        // Load .env if it exists
+        if (File.Exists(".env"))
+        {
+            Env.Load();
+        }
+
+        string? username = Environment.GetEnvironmentVariable("PROTON_USERNAME");
+        string? password = Environment.GetEnvironmentVariable("PROTON_PASSWORD");
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            Console.Write("Enter your Proton username: ");
+            username = Console.ReadLine() ?? string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            Console.Write("Enter your Proton password: ");
+            password = Console.ReadLine() ?? string.Empty;
+        }
+
+        // Save to .env if needed
+        if (!File.Exists(".env") || 
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PROTON_USERNAME")) ||
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PROTON_PASSWORD")))
+        {
+            File.WriteAllLines(".env", new[]
+            {
+                $"PROTON_USERNAME={username}",
+                $"PROTON_PASSWORD={password}"
+            });
+        }
+
         Console.WriteLine("Proton Drive Client Test");
         var sessionBeginRequest = new SessionBeginRequest
         {
-            Username = "user@protonmail.com",
-            Password = "password",
+            Username = username,
+            Password = password,
             Options = new() { AppVersion = "macos-drive@1.0.0-alpha.1+rclone" },
         };
         Console.WriteLine("Starting session with username: " + sessionBeginRequest.Username);
@@ -34,6 +69,8 @@ public class Program
 
             await session.ApplySecondFactorCodeAsync(two_factor, cancellationToken);
         }
+
+        await session.ApplyDataPasswordAsync(Encoding.UTF8.GetBytes(password), CancellationToken.None);
 
         var client = new ProtonDriveClient(session);
         Console.WriteLine("Creating new ProtonDriveClient instance.");

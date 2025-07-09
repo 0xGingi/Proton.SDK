@@ -32,7 +32,8 @@ internal static class InteropProtonApiSession
     internal unsafe struct InteropTwoFactorRequestedCallback
     {
         public nint State;
-        public delegate* unmanaged[Cdecl]<nint, InteropArray, out InteropArray, bool> Callback;
+        // essentially output1 is the 2fa, second one is the data password.
+        public delegate* unmanaged[Cdecl]<nint, InteropArray, out InteropArray, out InteropArray, bool> Callback;
     }
 
     [UnmanagedCallersOnly(EntryPoint = "session_begin", CallConvs = [typeof(CallConvCdecl)])]
@@ -64,21 +65,24 @@ internal static class InteropProtonApiSession
                 : null;
 
             var onTwoFactorRequested = twoFactorRequestedCallback.Callback != null && twoFactorRequestedCallback.State != nint.Zero
-                ? new Func<KeyCacheMissMessage, string?>(keyCacheMissMessage =>
+                ? new Func<KeyCacheMissMessage, (string? TwoFactor, string? DataPassword)>(keyCacheMissMessage =>
                 {
                     Console.WriteLine("Two factor callback ping");
                     var contextBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
-                    InteropArray outCode;
-                    var result = twoFactorRequestedCallback.Callback(twoFactorRequestedCallback.State, contextBytes, out outCode);
+                    InteropArray outCode, outDataPassword;
+                    var result = twoFactorRequestedCallback.Callback(
+                        twoFactorRequestedCallback.State, contextBytes, out outCode, out outDataPassword);
                     contextBytes.Free();
                     if (result)
                     {
-                        var stringResponse = StringResponse.Parser.ParseFrom(outCode.AsReadOnlySpan());
+                        var twoFactor = StringResponse.Parser.ParseFrom(outCode.AsReadOnlySpan()).Value;
+                        var dataPassword = StringResponse.Parser.ParseFrom(outDataPassword.AsReadOnlySpan()).Value;
                         outCode.Free();
-                        return stringResponse.Value;
+                        outDataPassword.Free();
+                        return (twoFactor, dataPassword);
                     }
 
-                    return null;
+                    return (null, null);
                 })
                 : null;
 
@@ -287,7 +291,7 @@ internal static class InteropProtonApiSession
         InteropArray sessionBeginRequestBytes,
         InteropRequestResponseBodyCallback requestResponseBodyCallback,
         Func<KeyCacheMissMessage, bool>? onSecretRequested,
-        Func<KeyCacheMissMessage, string?>? onTwoFactorRequested,
+        Func<KeyCacheMissMessage, (string? TwoFactor, string? DataPassword)>? onTwoFactorRequested,
         InteropTokensRefreshedCallback tokensRefreshedCallback,
         CancellationToken cancellationToken)
     {
@@ -317,6 +321,8 @@ internal static class InteropProtonApiSession
                 sessionBeginRequest,
                 cancellationToken).ConfigureAwait(false);
 
+            session.LoggerFactory.CreateLogger<ProtonApiSession>().LogInformation("Session created: {UserId}", session.UserId);
+
             // 2FA callback logic
             if (session.IsWaitingForSecondFactorCode && onTwoFactorRequested != null)
             {
@@ -326,10 +332,23 @@ internal static class InteropProtonApiSession
                     HolderName = session.Username,
                     ValueName = "two_factor_code"
                 };
-                var code = onTwoFactorRequested(twoFactorRequest);
+                var (code, dataPassword) = onTwoFactorRequested(twoFactorRequest);
                 if (!string.IsNullOrEmpty(code))
                 {
                     await session.ApplySecondFactorCodeAsync(code, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    Console.WriteLine("2FA code is empty or null");
+                }
+
+                if (!string.IsNullOrEmpty(dataPassword))
+                {
+                    await session.ApplyDataPasswordAsync(Encoding.UTF8.GetBytes(dataPassword), cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    Console.WriteLine("Data password is empty or null");
                 }
             }
 
@@ -341,6 +360,7 @@ internal static class InteropProtonApiSession
         }
         catch (Exception e)
         {
+            Console.WriteLine($"Session begin caught an exception: {e}");
             return ResultExtensions.Failure(e, InteropErrorConverter.SetDomainAndCodes);
         }
     }

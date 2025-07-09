@@ -60,7 +60,7 @@ public sealed class ProtonDriveClient
     internal static RecyclableMemoryStreamManager MemoryStreamManager { get; } = new();
 
     internal ProtonAccountClient Account { get; }
-    internal ISecretsCache SecretsCache { get; }
+    internal ISecretsCache SecretsCache { get; set; }
 
     internal VolumesApiClient VolumesApi => new(_defaultHttpClient);
     internal DevicesApiClient DevicesApi => new(_defaultHttpClient);

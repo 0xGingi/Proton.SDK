@@ -37,7 +37,8 @@ typedef struct {
 
 typedef struct {
     const void* state;
-    bool (*callback)(const void* state, ByteArray context, ByteArray* out_code); // KeyCacheMissMessage, StringResponse
+    bool (*callback)(const void* state, ByteArray context, ByteArray* out_2fa, ByteArray* out_data_password); 
+    // KeyCacheMissMessage, StringResponse, StringResponse
 } TwoFactorRequestedCallback;
 
 // Cancellation

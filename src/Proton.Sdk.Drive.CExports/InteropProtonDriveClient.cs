@@ -82,8 +82,9 @@ internal static class InteropProtonDriveClient
 
             return 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Exception caught while registering share key... {ex}");
             return -1;
         }
     }
@@ -117,8 +118,9 @@ internal static class InteropProtonDriveClient
 
             return 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Exception caught while registering node key... {ex}");
             return -1;
         }
     }
@@ -167,8 +169,9 @@ internal static class InteropProtonDriveClient
             var bytes = response.ToByteArray();
             return InteropArray.FromMemory(bytes);
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Exception caught while fetching volumes... {ex}");
             return InteropArray.FromMemory(Array.Empty<byte>());
         }
     }
@@ -206,9 +209,9 @@ internal static class InteropProtonDriveClient
             Console.WriteLine("Returning successful response");
             return InteropArray.FromMemory(bytes);
         }
-        catch
+        catch (Exception ex)
         {
-            Console.WriteLine("Error in NativeGetShare, returning empty array");
+            Console.WriteLine($"Exception caught while fetching shares... {ex}");
             return InteropArray.FromMemory(Array.Empty<byte>());
         }
     }
@@ -226,39 +229,77 @@ internal static class InteropProtonDriveClient
 
             var nodeIdentity = NodeIdentity.Parser.ParseFrom(nodeIdentityBytes.AsReadOnlySpan());
 
-            var nodes = client.GetFolderChildrenAsync(nodeIdentity, token)
-                .ToBlockingEnumerable()
-                .Select(n =>
-                {
-                    var node = new NodeType();
-                    switch (n)
-                    {
-                        case FileNode file:
-                            node.FileNode = new FileNode
-                            {
-                                NodeIdentity = file.NodeIdentity,
-                                ParentId = file.ParentId,
-                                Name = file.Name,
-                                NameHashDigest = file.NameHashDigest,
-                                State = file.State,
-                                ActiveRevision = file.ActiveRevision
-                            };
-                            break;
-                        case FolderNode folder:
-                            node.FolderNode = new FolderNode
-                            {
-                                NodeIdentity = folder.NodeIdentity,
-                                ParentId = folder.ParentId,
-                                Name = folder.Name,
-                                NameHashDigest = folder.NameHashDigest,
-                                State = folder.State
-                            };
-                            break;
-                    }
+            try
+            {
+                Node.GetKeyAsync(client, nodeIdentity, token).GetAwaiter().GetResult();
+                // Console.WriteLine($"[Interop] Ensure node key for nodeId={nodeIdentity.NodeId} in volumeId={nodeIdentity.VolumeId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Interop] Failed to ensure node key: {ex}");
+            }
 
-                    return node;
-                })
-                .ToList();
+            // Log secrets cache miss requests
+            if (client.SecretsCache is not null)
+            {
+                var originalCache = client.SecretsCache;
+                client.SecretsCache = new DebugSecretsCache(originalCache);
+            }
+            else
+            {
+                Console.WriteLine("[Interop] Secrets cache is null");
+            }
+
+            // Console.WriteLine($"[Interop] Listing children for nodeId={nodeIdentity.NodeId} in volumeId={nodeIdentity.VolumeId}");
+
+            List<NodeType> nodes;
+            try
+            {
+                nodes = client.GetFolderChildrenAsync(nodeIdentity, token, includeHidden: true)
+                    .ToBlockingEnumerable()
+                    .Select(n =>
+                    {
+                        var node = new NodeType();
+                        switch (n)
+                        {
+                            case FileNode file:
+                                node.FileNode = new FileNode
+                                {
+                                    NodeIdentity = file.NodeIdentity,
+                                    ParentId = file.ParentId,
+                                    Name = file.Name,
+                                    NameHashDigest = file.NameHashDigest,
+                                    State = file.State,
+                                    ActiveRevision = file.ActiveRevision
+                                };
+                                break;
+                            case FolderNode folder:
+                                node.FolderNode = new FolderNode
+                                {
+                                    NodeIdentity = folder.NodeIdentity,
+                                    ParentId = folder.ParentId,
+                                    Name = folder.Name,
+                                    NameHashDigest = folder.NameHashDigest,
+                                    State = folder.State
+                                };
+                                break;
+                        }
+
+                        return node;
+                    })
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Interop] Exception while enumerating children: {ex}");
+                return InteropArray.FromMemory(Array.Empty<byte>());
+            }
+
+            Console.WriteLine($"[Interop] Found {nodes.Count} children");
+            if (nodes.Count == 0)
+            {
+                Console.WriteLine("[Interop] No children found for this folder.");
+            }
 
             var nodeTypeList = new NodeTypeList();
             nodeTypeList.Nodes.AddRange(nodes);
@@ -266,8 +307,9 @@ internal static class InteropProtonDriveClient
             var bytes = nodeTypeList.ToByteArray();
             return InteropArray.FromMemory(bytes);
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Exception caught while fetching folder children... {ex}");
             return InteropArray.FromMemory(Array.Empty<byte>());
         }
     }

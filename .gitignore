@@ -355,3 +355,6 @@ build/output
 *.DS_Store
 .AppleDouble
 .LSOverride
+
+*.env
+/**/*/*.env
