@@ -60,8 +60,9 @@ internal static class InteropProtonDriveClient
 
             return 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine("Exception caught while trying to create a ProtonDriveClient: " + ex);
             return -1;
         }
     }
@@ -206,7 +207,7 @@ internal static class InteropProtonDriveClient
                 RootNodeId = share.RootNodeId // this changes for each folder...
             };
             var bytes = response.ToByteArray();
-            Console.WriteLine("Returning successful response");
+            // Console.WriteLine("Returning successful response");
             return InteropArray.FromMemory(bytes);
         }
         catch (Exception ex)
@@ -291,14 +292,14 @@ internal static class InteropProtonDriveClient
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Interop] Exception while enumerating children: {ex}");
+                // Console.WriteLine($"[Interop] Exception while enumerating children: {ex}");
                 return InteropArray.FromMemory(Array.Empty<byte>());
             }
 
-            Console.WriteLine($"[Interop] Found {nodes.Count} children");
+            // Console.WriteLine($"[Interop] Found {nodes.Count} children");
             if (nodes.Count == 0)
             {
-                Console.WriteLine("[Interop] No children found for this folder.");
+                // Console.WriteLine("[Interop] No children found for this folder.");
             }
 
             var nodeTypeList = new NodeTypeList();
