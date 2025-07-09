@@ -80,13 +80,50 @@ public class Program
             Console.WriteLine("No volumes found.");
             return;
         }
-
+        
         Console.WriteLine($"Found {volumes.Length} volume(s).");
         Console.WriteLine($"Volume size: {volumes[0].MaxSpace}");
         Console.WriteLine("Volume ID: " + volumes[0].Id);
         var mainVolume = volumes[0];
         var share = await client.GetShareAsync(mainVolume.RootShareId, cancellationToken);
+        var rootNodeIdentity = new NodeIdentity(share.ShareId, mainVolume.Id, share.RootNodeId);
+        // Start monitoring file revisions every 30 seconds
+        await MonitorFileRevisionsAsync(client, rootNodeIdentity, cancellationToken, share, mainVolume);
         await CheckFolderChildrenRecursiveAsync(client, share, mainVolume, cancellationToken);
+    }
+
+    private static async Task MonitorFileRevisionsAsync(ProtonDriveClient client, NodeIdentity nodeIdentity, CancellationToken token,
+        Share share, Volume volume)
+    {
+        var seenRevisionIds = new HashSet<string>();
+        while (true)
+        {
+            bool foundUpdate = false;
+            try
+            {
+                var revisions = await client.GetFileRevisionsAsync(nodeIdentity, token);
+                foreach (var revision in revisions)
+                {
+                    Console.WriteLine("Revision found");
+                    var children = client.GetFolderChildrenAsync(
+                        new NodeIdentity(share.ShareId, volume.Id, revision.FileId),
+                        token);
+                    await foreach (var child in children)
+                    {
+                        Console.WriteLine($"Name of change: {child.Name}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching revisions: {ex.Message}");
+            }
+            if (!foundUpdate)
+            {
+                Console.WriteLine("nothing");
+            }
+            await Task.Delay(TimeSpan.FromSeconds(10), token);
+        }
     }
 
     private static async Task CheckFolderChildrenRecursiveAsync(
