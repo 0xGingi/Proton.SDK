@@ -292,7 +292,7 @@ internal static class InteropProtonDriveClient
             }
             catch (Exception ex)
             {
-                // Console.WriteLine($"[Interop] Exception while enumerating children: {ex}");
+                 Console.WriteLine($"[Interop] Exception while enumerating children: {ex}");
                 return InteropArray.FromMemory(Array.Empty<byte>());
             }
 
