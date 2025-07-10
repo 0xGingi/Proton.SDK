@@ -104,13 +104,17 @@ public class Program
                 var revisions = await client.GetFileRevisionsAsync(nodeIdentity, token);
                 foreach (var revision in revisions)
                 {
+                    var revise = revision;
                     Console.WriteLine("Revision found");
-                    var children = client.GetFolderChildrenAsync(
-                        new NodeIdentity(share.ShareId, volume.Id, revision.FileId),
-                        token);
-                    await foreach (var child in children)
+                    foundUpdate = true;
+
+                    var file = await client.GetNodeAsync(share.ShareId, revision.FileId, CancellationToken.None);
+                    if (file is FolderNode folder)
                     {
-                        Console.WriteLine($"Name of change: {child.Name}");
+                        Console.WriteLine("Folder found");
+                    } else if (file is FileNode fileNode)
+                    {
+                        Console.WriteLine($"File that got changed: {file.Name}, to state {file.State}");
                     }
                 }
             }
