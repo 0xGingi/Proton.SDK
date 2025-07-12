@@ -80,14 +80,13 @@ public class Program
             Console.WriteLine("No volumes found.");
             return;
         }
-        
+
         Console.WriteLine($"Found {volumes.Length} volume(s).");
         Console.WriteLine($"Volume size: {volumes[0].MaxSpace}");
         Console.WriteLine("Volume ID: " + volumes[0].Id);
         var mainVolume = volumes[0];
         var share = await client.GetShareAsync(mainVolume.RootShareId, cancellationToken);
         var rootNodeIdentity = new NodeIdentity(share.ShareId, mainVolume.Id, share.RootNodeId);
-        // Start monitoring file revisions every 30 seconds
         await MonitorFileRevisionsAsync(client, rootNodeIdentity, cancellationToken, share, mainVolume);
         await CheckFolderChildrenRecursiveAsync(client, share, mainVolume, cancellationToken);
     }

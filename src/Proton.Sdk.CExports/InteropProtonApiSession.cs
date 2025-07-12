@@ -150,8 +150,9 @@ internal static class InteropProtonApiSession
             *sessionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(session));
             return 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Session resume caught an exception: {ex}");
             return -1;
         }
     }
@@ -420,6 +421,32 @@ internal static class InteropProtonApiSession
         catch (Exception e)
         {
             Console.WriteLine($"Exception caught while fetching sesison info: {e}");
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "session_apply_data_password", CallConvs = [typeof(CallConvCdecl)])]
+    private static unsafe int ApplyDataPasswordAsyncInterop(nint sessionHandle, InteropArray password, nint cancellationToken)
+    {
+        try
+        {
+            if (!TryGetFromHandle(sessionHandle, out var session))
+            {
+                return -1;
+            }
+
+            InteropCancellationTokenSource.TryGetTokenFromHandle(cancellationToken, out var token);
+
+            var passwordBytes = password.ToArray();
+            var response = StringResponse.Parser.ParseFrom(passwordBytes);
+
+            session.ApplyDataPasswordAsync(Encoding.UTF8.GetBytes(response.Value), token).GetAwaiter().GetResult();
+
+            return 0;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Exception caught while applying data password: {e}");
             return -1;
         }
     }

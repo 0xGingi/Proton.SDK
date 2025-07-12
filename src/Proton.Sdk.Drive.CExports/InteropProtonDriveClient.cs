@@ -240,7 +240,6 @@ internal static class InteropProtonDriveClient
                 Console.WriteLine($"[Interop] Failed to ensure node key: {ex}");
             }
 
-            // Log secrets cache miss requests
             if (client.SecretsCache is not null)
             {
                 var originalCache = client.SecretsCache;

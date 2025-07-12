@@ -229,3 +229,8 @@ message KeyCacheMissMessage {
     optional string context_name = 4;
     string value_name = 5;
 }
+
+message SessionKeysExport {
+    repeated ArmoredUserKey user_keys = 1;
+    repeated AddressKeyRegistrationRequest address_keys = 2;
+}

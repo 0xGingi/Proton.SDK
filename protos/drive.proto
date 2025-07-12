@@ -287,3 +287,8 @@ message NodeType {
 message NodeTypeList {
     repeated NodeType nodes = 1;
 }
+
+message DriveKeysExport {
+    repeated NodeKeysRegistrationRequest node_keys = 1;
+    repeated ShareKeyRegistrationRequest share_keys = 2;
+}
