@@ -51,7 +51,7 @@ internal static class InteropProtonApiSession
             var onSecretRequested = secretRequestedCallback.OnSecretRequested != null && secretRequestedCallback.State != null
                 ? new Func<KeyCacheMissMessage, bool>(keyCacheMissMessage =>
                 {
-//                    Console.WriteLine("Secret requested ping");
+                    //                    Console.WriteLine("Secret requested ping");
                     var messageBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
                     try
                     {
@@ -67,7 +67,7 @@ internal static class InteropProtonApiSession
             var onTwoFactorRequested = twoFactorRequestedCallback.Callback != null && twoFactorRequestedCallback.State != nint.Zero
                 ? new Func<KeyCacheMissMessage, (string? TwoFactor, string? DataPassword)>(keyCacheMissMessage =>
                 {
-//                    Console.WriteLine("Two factor callback ping");
+                    //                    Console.WriteLine("Two factor callback ping");
                     var contextBytes = InteropArray.FromMemory(keyCacheMissMessage.ToByteArray());
                     InteropArray outCode, outDataPassword;
                     var result = twoFactorRequestedCallback.Callback(
@@ -385,5 +385,42 @@ internal static class InteropProtonApiSession
         session.SecretsCache.Set(cacheKey, keyData, 1);
         var cacheKeys = new List<CacheKey>(1) { cacheKey };
         session.SecretsCache.IncludeInGroup(ProtonAccountClient.GetUserKeyGroupCacheKey(session.UserId), CollectionsMarshal.AsSpan(cacheKeys));
+    }
+
+    [UnmanagedCallersOnly(EntryPoint = "session_get_info", CallConvs = [typeof(CallConvCdecl)])]
+    private static unsafe int GetSessionInfo(nint sessionHandle, nint cancellationToken, InteropArray* session_info)
+    {
+        try
+        {
+            if (!TryGetFromHandle(sessionHandle, out var session))
+            {
+                return -1;
+            }
+
+            InteropCancellationTokenSource.TryGetTokenFromHandle(cancellationToken, out var token);
+
+            var (access, refresh) = session.TokenCredential.GetTokensAsync(token).Result;
+            var info = new SessionInfo
+            {
+                SessionId = session.SessionId,
+                Username = session.Username,
+                UserId = session.UserId,
+                AccessToken = access,
+                RefreshToken = refresh,
+                IsWaitingForSecondFactorCode = session.IsWaitingForSecondFactorCode,
+                PasswordMode = session.PasswordMode,
+            };
+            if (session.Scopes is not null)
+                info.Scopes.AddRange(session.Scopes);
+
+            var bytes = info.ToByteArray();
+            *session_info = InteropArray.FromMemory(bytes);
+            return 0;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Exception caught while fetching sesison info: {e}");
+            return -1;
+        }
     }
 }
