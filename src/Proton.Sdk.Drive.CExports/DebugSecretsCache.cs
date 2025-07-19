@@ -1,4 +1,6 @@
+using System.Collections;
 using Proton.Sdk.Cryptography;
+using Proton.Sdk.Drive;
 
 namespace Proton.Sdk.Drive.CExports;
 

@@ -88,6 +88,18 @@ int session_end(
 
 void session_free(intptr_t session_handle);
 
+int session_get_info(
+    intptr_t session_handle,
+    intptr_t cancellation_token,
+    ByteArray* out_session_info // SessionInfo
+);
+
+int session_apply_data_password(
+    intptr_t session_handle,
+    ByteArray password, // StringResponse
+    intptr_t cancellation_token
+);
+
 // Keys
 
 int session_register_armored_locked_user_key(
@@ -138,7 +150,7 @@ ByteArray drive_client_get_shares(
     intptr_t cancellation_token
 );
 
-// NodeType
+// Response: NodeType
 ByteArray drive_client_get_folder_children(
     intptr_t client_handle,
     ByteArray node_identity, // NodeIdentity

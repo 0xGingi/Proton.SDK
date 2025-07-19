@@ -86,7 +86,47 @@ public class Program
         Console.WriteLine("Volume ID: " + volumes[0].Id);
         var mainVolume = volumes[0];
         var share = await client.GetShareAsync(mainVolume.RootShareId, cancellationToken);
+        var rootNodeIdentity = new NodeIdentity(share.ShareId, mainVolume.Id, share.RootNodeId);
+        await MonitorFileRevisionsAsync(client, rootNodeIdentity, cancellationToken, share, mainVolume);
         await CheckFolderChildrenRecursiveAsync(client, share, mainVolume, cancellationToken);
+    }
+
+    private static async Task MonitorFileRevisionsAsync(ProtonDriveClient client, NodeIdentity nodeIdentity, CancellationToken token,
+        Share share, Volume volume)
+    {
+        var seenRevisionIds = new HashSet<string>();
+        while (true)
+        {
+            bool foundUpdate = false;
+            try
+            {
+                var revisions = await client.GetFileRevisionsAsync(nodeIdentity, token);
+                foreach (var revision in revisions)
+                {
+                    var revise = revision;
+                    Console.WriteLine("Revision found");
+                    foundUpdate = true;
+
+                    var file = await client.GetNodeAsync(share.ShareId, revision.FileId, CancellationToken.None);
+                    if (file is FolderNode folder)
+                    {
+                        Console.WriteLine("Folder found");
+                    } else if (file is FileNode fileNode)
+                    {
+                        Console.WriteLine($"File that got changed: {file.Name}, to state {file.State}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching revisions: {ex.Message}");
+            }
+            if (!foundUpdate)
+            {
+                Console.WriteLine("nothing");
+            }
+            await Task.Delay(TimeSpan.FromSeconds(10), token);
+        }
     }
 
     private static async Task CheckFolderChildrenRecursiveAsync(
